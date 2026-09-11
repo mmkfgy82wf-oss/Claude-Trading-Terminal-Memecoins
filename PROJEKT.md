@@ -1,0 +1,252 @@
+# MEMEDESK — Projektdokumentation
+
+Vollständige Aufzeichnung dessen, was geplant, entschieden, gebaut und geprüft
+wurde. Stand: 11. September 2026.
+
+---
+
+## 1. Auftrag und Interview
+
+**Auftrag:** Ein autonomes Memecoin-Trading-Terminal mit schönem Design,
+Animationen und mehreren zusammenarbeitenden Agenten, die den Markt im Blick
+behalten.
+
+Da mehrere Auslegungen zu deutlich unterschiedlicher Arbeit geführt hätten,
+habe ich vor dem Bauen zwei Interviewrunden geführt. Deine Antworten:
+
+| Frage | Entscheidung |
+|---|---|
+| Echte Trades oder Simulation? | **Zuerst Paper-Trading mit echten On-Chain-Daten**, Wallet-Anbindung für später vorbereiten |
+| Welche Chain? | **Solana + Robinhood Chain** |
+| Wie soll es laufen? | **Next.js Web-Terminal, dunkles Neon-Design** |
+| Woher die Daten? | **DexScreener + optionale Keys** (Birdeye/Helius) |
+| Wie denken die Agenten? | **Deterministische Engine + optionaler Claude-Layer** |
+| Wie autonom? | **Autonom, aber per Toggle auf Freigabe-Modus umschaltbar** |
+| Kapital & Risiko | **10 SOL, aggressives Profil** |
+
+### Eine Einschränkung, die ich vorab benannt habe
+
+**Robinhood Chain** ist eine sehr junge EVM-L2 (Arbitrum Orbit). Es gibt dort
+derzeit praktisch keine öffentliche DEX-Indizierung für Memecoins. Statt dir
+erfundene Zahlen als "live" zu verkaufen, habe ich eine **Chain-Adapter-
+Architektur** gebaut: Der Robinhood-Adapter probiert bei jedem Discovery-Zyklus
+eine echte Abfrage, schaltet bei Fehlschlag sichtbar auf den Simulator um und
+kennzeichnet das in der UI (`SIMULATED`-Badge pro Chain, `SIM`-Marker pro Paar).
+Sobald DexScreener die Chain indiziert, läuft sie ohne Codeänderung live —
+nur der Slug in `src/lib/market/chains.ts` muss ggf. angepasst werden.
+
+---
+
+## 2. Was gebaut wurde — Architektur
+
+```
+Markt-Feed ──▶ Blackboard ──▶ 6 Agenten ──▶ Konsens ──▶ Risk ──▶ Executor ──▶ Paper-Wallet
+   │                                                                              │
+   └── DexScreener live / Simulator-Fallback                        SSE ──▶ Next.js UI
+```
+
+### 2.1 Das Blackboard-Muster (die "Zusammenarbeit")
+
+Die Agenten rufen einander **nie direkt auf**. Sie lesen den gemeinsamen
+Arbeitsspeicher (`src/lib/agents/blackboard.ts`) und schreiben ihr eigenes
+Urteil zurück. Das hat drei konkrete Vorteile:
+
+- Die Reihenfolge ist austauschbar, ein Agent kann entfernt oder ergänzt werden,
+  ohne die anderen anzufassen.
+- Jede Entscheidung ist prüfbar: Wer hat wann was mit welcher Begründung gesagt.
+  Genau das rendert die UI im aufklappbaren **Audit-Trail** jeder Zeile.
+- Der Konsens ist eine Funktion über die Signale, kein Verhandlungsprotokoll.
+
+### 2.2 Die sechs Agenten
+
+| Agent | Rolle | Was er tatsächlich prüft |
+|---|---|---|
+| **SCOUT** ◈ | Discovery | Handelbarkeit (Liquidität vs. eigenem Floor), Turnover (Volumen ÷ Pool), Frische (Pair-Alter), Aufmerksamkeit (5m-Volumen-Burst gegen die eigene 24h-Laufrate). Reduziert hunderte Paare auf 14. |
+| **SENTINEL** ⛨ | Rug-Abwehr | Pool-Tiefe, FDV-zu-Liquidität-Verhältnis, Honeypot-Muster (Buys ohne Sells), Sell-Kaskaden, Alter. Mit Keys zusätzlich: Top-10-Holder-Anteil (Birdeye), aktive Mint-/Freeze-Authority (Helius). **Einziger Agent mit Vetorecht.** |
+| **QUANT** ∿ | Momentum & Flow | Multi-Timeframe-Trend, Order-Flow-Imbalance, Volumen-Beschleunigung, **Extension-Penalty** (kauft keine bereits senkrechte Kerze), realisierte Volatilität, Trendsteigung aus der eigenen Preishistorie. Schwerste Stimme im Konsens. |
+| **NARRATOR** ❝ | Narrativ | Meme-Lexikon-Treffer, Ticker-Aussprechbarkeit, "abgeleitete" Namen (V2, SAFE…), Crowd-Struktur (viele kleine Tickets = Menge, wenige große = ein Desk). Mit `ANTHROPIC_API_KEY` zusätzlich eine Claude-Lesung, die zu 40 % einfließt — nie beherrschend. |
+| **RISK** ⚖ | Sizing & Exposure | Positionsgröße nach Überzeugung, Positions-Cap, Exposure-Cap, Cash, maximaler Ticket-Anteil am Pool, projizierte Slippage, Tagesverlustlimit, Kill-Switch. Der einzige Ort, an dem entschieden wird, wie viel Risiko läuft. |
+| **EXECUTOR** ▶ | Fills & Exits | Führt freigegebene Tickets aus und verwaltet **jeden Ausstieg selbstständig**: Stop-Loss, Take-Profit-Leiter, Trailing-Stop, spätes SENTINEL-Veto, Liquiditätsverfall, Kill-Switch. |
+
+**Konsens-Gewichtung:** QUANT 0.5, NARRATOR 0.3, SCOUT 0.2, jeweils zusätzlich
+mit der Confidence des Agenten skaliert. SENTINEL hat bewusst **kein Gewicht** —
+ein Veto ist stärker als jede Gewichtung es ausdrücken könnte und kappt den
+Score hart auf ≤ −60.
+
+### 2.3 Handels-Regeln (aggressives Profil, zur Laufzeit änderbar)
+
+- Startkapital 10 SOL · max. 15 % pro Position · max. 6 offene Positionen
+- max. 70 % Gesamtexposure · Stop-Loss −25 %
+- Take-Profit-Leiter +50 % / +150 % / +400 % (verkauft 40 % / 35 % / Rest)
+- Trailing-Stop −30 %, **scharf erst nach der ersten TP-Stufe** — sonst würde
+  normales Memecoin-Rauschen jeden Einstieg sofort ausstoppen
+- max. 3 % Slippage bei Einstiegen; **Ausstiege werden nie durch Slippage
+  blockiert** — in einem Rug festzustecken ist schlimmer als ein schlechter Fill
+- Tagesverlustlimit −35 % stoppt neue Einstiege
+
+### 2.4 Slippage- und Kostenmodell
+
+Fills sind nicht der Mittelkurs. Die Slippage wächst quadratisch mit dem
+Verhältnis Order zu Pool (`estimateSlippagePct`), dazu kommen DEX- und
+Priority-Fees. Ein 2-SOL-Ticket in einen 12k-Pool tut weh — und das Terminal
+soll das spüren, sonst sind die Papierergebnisse wertlos.
+
+### 2.5 Marktdaten
+
+- **Live:** DexScreener-Suche für Discovery, gebündelte Pair-Abfragen (30 pro
+  Request) für Refreshes. Preishistorie wird über Refreshes hinweg gehalten,
+  damit die Charts durchgehend bleiben.
+- **Fallback:** Ein Memecoin-**Simulator** mit Archetypen (Runner, Pumper,
+  Slow-Burner, Ruggable, Dead) inklusive echter Lifecycle-Ereignisse:
+  Liquiditätsabzug, Sell-Kaskade, Wiederbelebung. Kein reiner Random-Walk —
+  Agenten sind nur gegen einen Feed testbar, der diese Regime reproduziert.
+- **Umschaltung:** pro Chain automatisch, sichtbar in der Statusleiste unten.
+
+### 2.6 Live-Wallet-Anbindung (vorbereitet, bewusst inaktiv)
+
+`src/lib/trading/executor.ts` definiert das Interface `TradeExecutor`.
+`PaperExecutor` ist die aktive Implementierung. `LiveSolanaExecutor` ist die
+Naht für später: gleiches Interface, gleiche Aufrufstellen. Sie verweigert die
+Arbeit, solange nicht **beides** vorliegt — ein Signer *und*
+`ENABLE_LIVE_TRADING=yes-i-accept-the-risk`. Damit kann kein
+Konfigurationsversehen Paper-Trading in echte Orders verwandeln.
+
+Der Weg zum Scharfschalten: Keypair aus einem eigenen Signer laden → Jupiter-
+Quote holen → Swap bauen, signieren, senden, bestätigen → bestätigte Transaktion
+auf ein `Fill` mappen. Die Agenten-Pipeline ändert sich dabei nicht.
+
+---
+
+## 3. Die Oberfläche
+
+### Layout
+Drei-Spalten-Desk auf großen Bildschirmen, einspaltig auf dem Handy. Jedes Panel
+scrollt in seinem eigenen Rahmen; die Seite selbst scrollt nie horizontal.
+
+- **Links:** Agenten-Desk (Status, aktuelle Tätigkeit, Auslastungsbalken,
+  Entscheidungszähler) + Freigabe-Queue
+- **Mitte:** Paper-Portfolio (Equity-Hero + Equity-Kurve + Kennzahlen),
+  Konsens-Board (aufklappbarer Audit-Trail), offene Positionen mit sichtbarem
+  Ausstiegsplan
+- **Rechts:** Signal-Feed (jede Agenten-Entscheidung, farbcodiert nach Agent),
+  Execution-Tape
+- **Oben:** Ticker-Tape, Autonomie-Toggle, Risk-Panel, Kill-Switch
+- **Unten:** Datenherkunft pro Chain (live vs. simuliert, im Klartext)
+
+### Animationen
+Boot-Sequenz, laufendes Ticker-Band (pausiert bei Hover), pulsierende
+Statuspunkte, Scanline, Feder-animierte Balken, Fade-in neuer Log- und
+Fill-Zeilen, Flash auf neuen Fills, Layout-animierter Autonomie-Toggle,
+Slide-in-Drawer. **Alles respektiert `prefers-reduced-motion`** — dort werden
+sämtliche Animationen abgeschaltet, inklusive Überspringen der Boot-Sequenz.
+
+### Farben — und warum sie so gewählt sind
+Die Agenten-/Serienfarben sind kein Bauchgefühl, sondern gegen die dunkle
+Oberfläche `#0a0b10` **rechnerisch validiert**: Helligkeitsband, Chroma-Floor,
+CVD-Trennung benachbarter Paare (Delta E 9.1, Ziel ≥ 8) und Kontrast ≥ 3:1
+bestehen alle. Die neonhellen `-glow`-Varianten sind ausschließlich Chrome
+(Ränder, Schatten, Hover) und nie eine Datenmarkierung.
+
+Gewinn/Verlust nutzt Grün/Rot — ein Paar, das für Rot-Grün-Schwäche grundsätzlich
+schwierig ist. Deshalb trägt **jede** P/L-Zahl zusätzlich ein ▲/▼ und ein
+Vorzeichen; die Farbe ist nie die einzige Information. Dasselbe gilt für die
+Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
+
+---
+
+## 4. Was geprüft wurde
+
+### Unit-Tests — 17, alle grün (`npm test`)
+- Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
+- Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
+- Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
+- Teilverkauf lässt den Rest offen, merkt sich die Stufe und **skaliert die
+  Kostenbasis mit** (sonst wäre jedes folgende P/L falsch)
+- Einstiege über Slippage-Budget werden verweigert
+- Ausstiege werden nie durch Slippage blockiert
+- Risk-Patches aus der UI werden geklemmt, nicht vertraut
+- Tagesverlust wird gegen den Sitzungs-Anker gemessen
+- SCOUT rankt tiefen, aktiven Pool über toten
+- SENTINEL vetoed Honeypot-Muster und Sell-Kaskaden, lässt Gesundes durch
+- QUANT bevorzugt konstruktiven Flow und diskontiert bereits gelaufene Bewegungen
+- Ein Veto überstimmt einen bullischen Konsens vollständig
+- RISK sized nie einen vetoed Namen und respektiert das Positionslimit
+- RISK hält Tickets innerhalb Positions- **und** Exposure-Cap
+- Kill-Switch verhindert jedes Öffnen von Risiko
+- Tagesverlustlimit stoppt neue Einstiege
+
+### Laufzeit-Test gegen den laufenden Server
+Die vollständige Pipeline wurde live beobachtet: SCOUT → SENTINEL-Veto → QUANT →
+RISK-Sizing → EXECUTOR-Fill, inklusive eines Veto-getriebenen Notausstiegs
+(`SELL WOJAKR · 100% · −0.091 SOL · sentinel veto: sell cascade in progress`).
+Kill-Switch liquidierte alle 6 Positionen; Manual-Modus erzeugte
+Freigabe-Tickets; ein freigegebenes Ticket wurde korrekt gefüllt.
+
+### Visuelle Prüfung im echten Browser
+Screenshots bei 1680 px und 400 px, geprüft auf horizontalen Overflow und
+Konsolenfehler. Beides sauber.
+
+### Drei echte Fehler, die dabei gefunden und behoben wurden
+
+1. **Exposure-Limit war in Summe umgehbar.** RISK berechnete den Headroom einmal
+   pro Tick und maß jedes Ticket gegen denselben Startwert — mehrere Tickets
+   eines Ticks konnten das Limit gemeinsam sprengen. Headroom und Cash werden
+   jetzt beim Ausgeben der Tickets verbraucht. *Der Test dafür war es, der den
+   Fehler aufgedeckt hat.*
+2. **Freigabe-Queue lief voll.** Im Manual-Modus wurden Tickets weiter erzeugt,
+   obwohl keine Slots frei waren — 12 Tickets, die nie alle hätten genommen
+   werden können, jedes davon veraltend gegenüber dem Setup, für das es
+   dimensioniert wurde. Die Queue-Tiefe ist jetzt an die freien Slots gebunden.
+3. **Tabellenzeilen sprangen.** Layout-Animationen auf `<tr>` kollabierten
+   Zeilenhöhen; ersetzt durch ein reines Fade.
+
+---
+
+## 5. Bekannte Grenzen
+
+- **Robinhood Chain läuft simuliert**, bis es dort öffentliche DEX-Indizierung
+  gibt. Das ist in der UI durchgehend gekennzeichnet.
+- **Der Zustand lebt im Prozess.** Ein Neustart setzt Paper-Wallet und Historie
+  zurück. Für Persistenz wäre ein Snapshot des `PaperWallet` auf Platte der
+  nächste Schritt.
+- **Ein einzelner Desk-Prozess.** Der Orchestrator ist ein Singleton auf
+  `globalThis`; für mehrere Nutzer bräuchte es eine Instanz pro Sitzung.
+- **Der Simulator ist plausibel, nicht kalibriert.** Er reproduziert Regime,
+  ist aber nicht gegen historische Memecoin-Daten gefittet. Papier-Ergebnisse
+  im Simulator sagen nichts über Live-Erträge.
+- **Kein Backtest.** Die Agenten sind gegen konstruierte Szenarien getestet,
+  nicht gegen historische Serien.
+
+## 6. Naheliegende nächste Schritte
+
+1. Paper-Wallet und Fill-Historie persistieren (JSON-Snapshot pro Tick)
+2. Backtest-Modus: Feed durch historische DexScreener-Kerzen ersetzen und die
+   Agenten unverändert darüber laufen lassen
+3. Live-Wallet: `LiveSolanaExecutor` mit Jupiter-Quotes implementieren, hinter
+   dem bestehenden Doppel-Opt-in
+4. Zweite Meinung für QUANT (ein zweites Modell, das gegen ihn stimmen darf)
+5. Positions-Detailansicht mit Kerzen statt Sparkline
+
+---
+
+## 7. Dateiübersicht
+
+```
+src/lib/types.ts                 Gemeinsames Vokabular (auch das SSE-Wire-Format)
+src/lib/market/chains.ts         Chain-Registry (Solana, Robinhood Chain)
+src/lib/market/dexscreener.ts    Live-Client, fällt nie hart aus
+src/lib/market/simulator.ts      Memecoin-Simulator mit Archetypen
+src/lib/market/feed.ts           Vereinheitlichter Feed, live ↔ simuliert
+src/lib/market/providers.ts      Optionale Anreicherung (Birdeye, Helius, SOL-Preis)
+src/lib/agents/blackboard.ts     Gemeinsamer Arbeitsspeicher + Konsensbildung
+src/lib/agents/roster.ts         Agenten-Stammdaten, validierte Farbslots
+src/lib/agents/base.ts           Agenten-Basisklasse
+src/lib/agents/{scout,sentinel,quant,narrator,risk,executor}.ts
+src/lib/agents/orchestrator.ts   Tick-Loop, Kommandos, Snapshots, SSE-Verteilung
+src/lib/trading/risk.ts          Risikoprofile + Klemmung von UI-Patches
+src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
+src/lib/trading/wallet.ts        Paper-Wallet, Buchhaltung, Kennzahlen
+src/app/api/{stream,control,state}/route.ts
+src/components/*.tsx             Terminal-Oberfläche
+tests/*.test.ts                  17 Unit-Tests
+```
