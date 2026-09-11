@@ -76,10 +76,22 @@ export function normalizePair(p: DsPair, chain: ChainId): Token | null {
   };
 }
 
+/**
+ * Which slug this chain is actually indexed under, once we have seen it work.
+ * Aggregators rename chains and add them late, so the working slug is
+ * discovered from live responses rather than trusted from a constant.
+ */
+const resolvedSlug = new Map<ChainId, string>();
+
+export function knownSlug(chain: ChainId): string | undefined {
+  return resolvedSlug.get(chain);
+}
+
 /** Trending/hot pairs for a chain, discovered through DexScreener search. */
 export async function fetchChainPairs(chain: ChainId, limit = 40): Promise<Token[]> {
   const adapter = CHAINS[chain];
-  if (!adapter.dexscreenerSlug) return [];
+  const candidates = adapter.dexscreenerSlugs;
+  if (candidates.length === 0) return [];
 
   const results = await Promise.all(
     adapter.discoveryQueries.map((q) =>
@@ -87,10 +99,16 @@ export async function fetchChainPairs(chain: ChainId, limit = 40): Promise<Token
     ),
   );
 
+  // Search is chain-agnostic, so the response itself tells us which slug this
+  // chain answers to — take the first candidate that actually appears.
+  const known = resolvedSlug.get(chain);
+  const accepted = new Set(known ? [known] : candidates);
+
   const seen = new Map<string, Token>();
   for (const r of results) {
     for (const p of r?.pairs ?? []) {
-      if (p.chainId !== adapter.dexscreenerSlug) continue;
+      if (!accepted.has(p.chainId)) continue;
+      if (!known) resolvedSlug.set(chain, p.chainId);
       const t = normalizePair(p, chain);
       if (t && !seen.has(t.id)) seen.set(t.id, t);
     }
@@ -102,13 +120,13 @@ export async function fetchChainPairs(chain: ChainId, limit = 40): Promise<Token
 
 /** Refresh a known set of pairs in one batched call (30 addresses per request). */
 export async function refreshPairs(chain: ChainId, addresses: string[]): Promise<Map<string, Token>> {
-  const adapter = CHAINS[chain];
+  const slug = resolvedSlug.get(chain) ?? CHAINS[chain].dexscreenerSlugs[0];
   const out = new Map<string, Token>();
-  if (!adapter.dexscreenerSlug || addresses.length === 0) return out;
+  if (!slug || addresses.length === 0) return out;
 
   for (let i = 0; i < addresses.length; i += 30) {
     const batch = addresses.slice(i, i + 30).join(",");
-    const r = await getJson<{ pairs?: DsPair[] }>(`${BASE}/pairs/${adapter.dexscreenerSlug}/${batch}`);
+    const r = await getJson<{ pairs?: DsPair[] }>(`${BASE}/pairs/${slug}/${batch}`);
     for (const p of r?.pairs ?? []) {
       const t = normalizePair(p, chain);
       if (t) out.set(t.id, t);
@@ -120,8 +138,9 @@ export async function refreshPairs(chain: ChainId, addresses: string[]): Promise
 /** One cheap request used to decide whether a chain has live coverage at all. */
 export async function probeChain(chain: ChainId): Promise<boolean> {
   const adapter = CHAINS[chain];
-  if (!adapter.dexscreenerSlug) return false;
   const q = adapter.discoveryQueries[0];
   const r = await getJson<{ pairs?: DsPair[] }>(`${BASE}/search?q=${encodeURIComponent(q)}`);
-  return Boolean(r?.pairs?.some((p) => p.chainId === adapter.dexscreenerSlug));
+  const hit = r?.pairs?.find((p) => adapter.dexscreenerSlugs.includes(p.chainId));
+  if (hit) resolvedSlug.set(chain, hit.chainId);
+  return Boolean(hit);
 }

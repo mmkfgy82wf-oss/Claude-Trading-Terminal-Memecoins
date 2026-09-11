@@ -1,6 +1,6 @@
 import type { ChainId, ChainStatus, MarketMode, Token } from "@/lib/types";
 import { CHAINS } from "./chains";
-import { fetchChainPairs, refreshPairs } from "./dexscreener";
+import { fetchChainPairs, knownSlug, refreshPairs } from "./dexscreener";
 import { MarketSimulator } from "./simulator";
 
 /**
@@ -57,9 +57,7 @@ export class ChainFeed {
             return [...this.tokens.values()];
           }
           return this.runSim(
-            this.chain === "robinhood"
-              ? "No public DEX index for Robinhood Chain yet — running the simulator."
-              : "Live feed unreachable — running the simulator.",
+            `No indexed pairs found for ${CHAINS[this.chain].label} — running the simulator.`,
           );
         }
         this.liveFailures = 0;
@@ -76,7 +74,8 @@ export class ChainFeed {
       }
 
       this.mode = "live";
-      this.note = `Live via DexScreener · ${this.tokens.size} pairs indexed.`;
+      const slug = knownSlug(this.chain);
+      this.note = `Live via DexScreener${slug ? ` (${slug})` : ""} · ${this.tokens.size} pairs indexed.`;
       this.lastFetchAt = Date.now();
       return [...this.tokens.values()];
     } catch {

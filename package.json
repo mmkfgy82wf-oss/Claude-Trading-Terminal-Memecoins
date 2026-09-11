@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --experimental-transform-types --import ./tests/register.mjs tests/*.test.ts"
+    "test": "node --test --experimental-transform-types --import ./tests/register.mjs tests/*.test.ts",
+    "check-chains": "node scripts/check-chains.mjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

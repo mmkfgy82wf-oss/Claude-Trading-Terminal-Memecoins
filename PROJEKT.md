@@ -24,16 +24,24 @@ habe ich vor dem Bauen zwei Interviewrunden geführt. Deine Antworten:
 | Wie autonom? | **Autonom, aber per Toggle auf Freigabe-Modus umschaltbar** |
 | Kapital & Risiko | **10 SOL, aggressives Profil** |
 
-### Eine Einschränkung, die ich vorab benannt habe
+### Eine Einschränkung, die ich zuerst falsch eingeschätzt hatte
 
-**Robinhood Chain** ist eine sehr junge EVM-L2 (Arbitrum Orbit). Es gibt dort
-derzeit praktisch keine öffentliche DEX-Indizierung für Memecoins. Statt dir
-erfundene Zahlen als "live" zu verkaufen, habe ich eine **Chain-Adapter-
-Architektur** gebaut: Der Robinhood-Adapter probiert bei jedem Discovery-Zyklus
-eine echte Abfrage, schaltet bei Fehlschlag sichtbar auf den Simulator um und
-kennzeichnet das in der UI (`SIMULATED`-Badge pro Chain, `SIM`-Marker pro Paar).
-Sobald DexScreener die Chain indiziert, läuft sie ohne Codeänderung live —
-nur der Slug in `src/lib/market/chains.ts` muss ggf. angepasst werden.
+Ich bin anfangs davon ausgegangen, **Robinhood Chain** sei zu jung für
+öffentliche DEX-Indizierung, und habe sie deshalb als simuliert ausgeliefert.
+Das war veraltet: Die Chain ist seit **1. Juli 2026** im Mainnet (Arbitrum
+Orbit, Chain ID 4663, Gas in ETH) und lag im Juli 2026 unter den Top 5 nach
+DEX-Volumen, mit Uniswap als Launch-Partner. Es gibt dort also sehr wohl echte
+Daten.
+
+Behoben durch **Slug-Autoerkennung**: Aggregatoren benennen Chains
+unterschiedlich und nehmen sie spät auf, deshalb rät der Adapter nicht mehr auf
+einen Namen, sondern probiert eine Kandidatenliste und rastet auf den Slug ein,
+unter dem die API tatsächlich antwortet. Der erkannte Slug steht in der
+Statusleiste. `npm run check-chains` zeigt es dir vorab.
+
+Die Simulator-Umschaltung bleibt als Sicherheitsnetz: Liefert eine Chain
+gerade nichts, läuft sie sichtbar simuliert (`SIMULATED`-Badge pro Chain,
+`SIM`-Marker pro Paar) statt erfundene Zahlen als live auszugeben.
 
 ---
 
@@ -82,7 +90,7 @@ hält deshalb **pro Chain eine eigene Kasse im jeweiligen Quote-Asset**:
 | Chain | Quote-Asset | Gebührenmodell |
 |---|---|---|
 | Solana | **SOL** | DEX-Fee + Priority-Fee, hoch genug für einen umkämpften Block |
-| Robinhood Chain | **ETH** | L2-Gas, absolut günstig, aber ETH ist pro Einheit ~20× SOL wert |
+| Robinhood Chain | **ETH** | L2-Gas, absolut günstig, aber ETH ist pro Einheit weit mehr wert |
 
 Ein Ticket auf einem RHC-Paar wird in ETH dimensioniert, aus der ETH-Kasse
 bezahlt und mit L2-Gas belastet — die SOL-Kasse wird nie berührt. Ist die Kasse
@@ -240,8 +248,9 @@ Konsolenfehler. Beides sauber.
 
 ## 5. Bekannte Grenzen
 
-- **Robinhood Chain läuft simuliert**, bis es dort öffentliche DEX-Indizierung
-  gibt. Das ist in der UI durchgehend gekennzeichnet.
+- **Chain-Abdeckung wird zur Laufzeit erkannt.** Antwortet eine Chain gerade
+  nicht, läuft sie sichtbar simuliert. Mit `npm run check-chains` siehst du
+  ohne Umweg, was bei dir live ist und unter welchem Slug.
 - **Der Zustand lebt im Prozess.** Ein Neustart setzt Paper-Wallet und Historie
   zurück. Für Persistenz wäre ein Snapshot des `PaperWallet` auf Platte der
   nächste Schritt.

@@ -44,7 +44,20 @@ npm run build      # Produktions-Build
 npm start          # Produktionsserver
 npm test           # Unit-Tests (21)
 npm run typecheck  # TypeScript ohne Emit
+npm run check-chains  # zeigt, welche Chains gerade live indiziert sind
 ```
+
+## Chain-Abdeckung
+
+Unter welchem Slug eine Chain bei DexScreener geführt wird, erkennt der Adapter
+selbst: Er probiert eine Kandidatenliste und rastet auf den ein, der antwortet.
+Der erkannte Slug steht in der Statusleiste unten. Antwortet eine Chain gar
+nicht, läuft sie sichtbar simuliert statt erfundene Zahlen als live auszugeben.
+
+| Chain | Chain ID | Gas / Quote | RPC |
+|---|---|---|---|
+| Solana | — | SOL | `api.mainnet-beta.solana.com` |
+| Robinhood Chain | 4663 | ETH | `rpc.mainnet.chain.robinhood.com` |
 
 ## Sicherheit
 
