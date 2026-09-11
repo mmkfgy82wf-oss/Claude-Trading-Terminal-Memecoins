@@ -124,15 +124,56 @@ export async function refreshPairs(chain: ChainId, addresses: string[]): Promise
   const out = new Map<string, Token>();
   if (!slug || addresses.length === 0) return out;
 
-  for (let i = 0; i < addresses.length; i += 30) {
-    const batch = addresses.slice(i, i + 30).join(",");
-    const r = await getJson<{ pairs?: DsPair[] }>(`${BASE}/pairs/${slug}/${batch}`);
+  // Batches run in parallel. Sequentially, a few hundred tracked pairs took
+  // longer than one tick, and the orchestrator's re-entry guard then dropped
+  // ticks silently — the desk looked frozen while it was really just waiting.
+  const batches: string[] = [];
+  for (let i = 0; i < addresses.length; i += 30) batches.push(addresses.slice(i, i + 30).join(","));
+
+  const responses = await Promise.all(
+    batches.map((batch) => getJson<{ pairs?: DsPair[] }>(`${BASE}/pairs/${slug}/${batch}`)),
+  );
+  for (const r of responses) {
     for (const p of r?.pairs ?? []) {
       const t = normalizePair(p, chain);
       if (t) out.set(t.id, t);
     }
   }
   return out;
+}
+
+/**
+ * Resolve token mint addresses into their deepest tradable pair.
+ *
+ * This is how a launchpad feed becomes something the desk can reason about: the
+ * launchpad says what exists, DexScreener says what it is worth and how deep the
+ * pool is. Only the deepest pair per token is kept — that is the one an order
+ * would actually route through.
+ */
+export async function fetchPairsForTokens(chain: ChainId, addresses: string[]): Promise<Token[]> {
+  if (addresses.length === 0) return [];
+  const slug = resolvedSlug.get(chain) ?? CHAINS[chain].dexscreenerSlugs[0];
+
+  const batches: string[] = [];
+  for (let i = 0; i < addresses.length; i += 30) batches.push(addresses.slice(i, i + 30).join(","));
+
+  const responses = await Promise.all(
+    batches.map((batch) => getJson<{ pairs?: DsPair[] }>(`${BASE}/tokens/${batch}`)),
+  );
+
+  const deepest = new Map<string, { token: Token; liquidity: number }>();
+  for (const r of responses) {
+    for (const p of r?.pairs ?? []) {
+      if (p.chainId !== slug) continue;
+      const token = normalizePair(p, chain);
+      if (!token) continue;
+      const current = deepest.get(token.tokenAddress);
+      if (!current || token.liquidityUsd > current.liquidity) {
+        deepest.set(token.tokenAddress, { token, liquidity: token.liquidityUsd });
+      }
+    }
+  }
+  return [...deepest.values()].map((d) => d.token);
 }
 
 /** One cheap request used to decide whether a chain has live coverage at all. */

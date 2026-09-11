@@ -115,7 +115,10 @@ export class Orchestrator {
         this.wallet.setPrices(this.quotePrices);
       }
 
-      const tokens = await this.feed.poll();
+      // Anything we still hold must stay in the universe, or its stop-loss
+      // would quietly stop being evaluated.
+      const held = new Set(this.wallet.openPositions().map((p) => p.tokenId));
+      const tokens = await this.feed.poll(held);
       this.board.setUniverse(tokens);
       const byId = new Map<string, Token>(tokens.map((t) => [t.id, t]));
       this.wallet.markToMarket(byId);

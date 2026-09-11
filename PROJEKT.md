@@ -120,6 +120,27 @@ soll das spüren, sonst sind die Papierergebnisse wertlos.
 
 ### 2.6 Marktdaten
 
+**Discovery und Pricing sind getrennte Quellen.** Eine Textsuche findet, was so
+heißt — also etablierte Token. Ein Coin von vor zehn Minuten hat einen Namen,
+den niemand kennt und nach dem folglich niemand sucht. Deshalb fragt der Feed
+**pump.fun** (das grösste Solana-Launchpad, Vorschlag des Nutzers), was neu ist,
+und löst die Mint-Adressen dann über DexScreener in echte Paardaten auf.
+
+Preise, Liquidität und Volumen kommen nie vom Launchpad: Vor der Graduation
+handeln pump.fun-Token gegen eine Bonding Curve statt gegen einen Pool, und das
+Slippage-Modell des Desks setzt einen Pool voraus. So bleiben alle Agenten und
+das gesamte Ausführungsmodell unverändert.
+
+Zwei Kohorten werden geholt: frisch gelauncht (maximale Asymmetrie, kaum
+Information — SENTINEL vetoed die meisten zu Recht auf Liquidität) und kurz vor
+der Graduation (Kurve gefüllt, echtes Geld drin, Migration in einen echten Pool
+steht an — hier greifen die Liquiditätsschwellen tatsächlich).
+
+pump.fun hat **keine offizielle Daten-API**; genutzt wird die undokumentierte
+Frontend-API. Der Parser toleriert deshalb umbenannte und fehlende Felder, und
+das Modul liefert im Zweifel eine leere Liste statt einen Tick zu brechen.
+`npm run check-sources` prüft das gegen die echte API.
+
 - **Live:** DexScreener-Suche für Discovery, gebündelte Pair-Abfragen (30 pro
   Request) für Refreshes. Preishistorie wird über Refreshes hinweg gehalten,
   damit die Charts durchgehend bleiben.
@@ -188,7 +209,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 21, alle grün (`npm test`)
+### Unit-Tests — 35, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -279,7 +300,8 @@ Konsolenfehler. Beides sauber.
 ```
 src/lib/types.ts                 Gemeinsames Vokabular (auch das SSE-Wire-Format)
 src/lib/market/chains.ts         Chain-Registry (Solana, Robinhood Chain)
-src/lib/market/dexscreener.ts    Live-Client, fällt nie hart aus
+src/lib/market/dexscreener.ts    Live-Client (Pricing), fällt nie hart aus
+src/lib/market/pumpfun.ts        Launchpad-Discovery: was ist neu?
 src/lib/market/simulator.ts      Memecoin-Simulator mit Archetypen
 src/lib/market/feed.ts           Vereinheitlichter Feed, live ↔ simuliert
 src/lib/market/providers.ts      Optionale Anreicherung (Birdeye, Helius, SOL-Preis)
@@ -293,5 +315,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  21 Unit-Tests
+tests/*.test.ts                  35 Unit-Tests
 ```

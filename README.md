@@ -44,8 +44,25 @@ npm run build      # Produktions-Build
 npm start          # Produktionsserver
 npm test           # Unit-Tests (21)
 npm run typecheck  # TypeScript ohne Emit
+npm run check-sources # prüft alle Datenquellen von deinem Netz aus
 npm run check-chains  # zeigt, welche Chains gerade live indiziert sind
 ```
+
+## Woher die Token kommen
+
+Zwei Quellen beantworten zwei verschiedene Fragen:
+
+| Quelle | Frage | Key nötig |
+|---|---|---|
+| **pump.fun** (Solana) | Was wurde gerade gelauncht? | nein |
+| **DexScreener** | Was ist es wert, und wie tief ist der Pool? | nein |
+
+Das ist bewusst getrennt: Eine Textsuche kann neue Launches nicht finden — ein
+Coin von vor zehn Minuten heißt nichts, wonach jemand sucht. Das Launchpad weiß,
+was existiert; erst der Aggregator weiß, ob ein Pool tief genug ist, um wieder
+herauszukommen. Preise und Liquidität kommen deshalb nie vom Launchpad.
+
+`npm run check-sources` zeigt dir, welche Quelle von deinem Netz aus antwortet.
 
 ## Chain-Abdeckung
 

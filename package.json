@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-transform-types --import ./tests/register.mjs tests/*.test.ts",
-    "check-chains": "node scripts/check-chains.mjs"
+    "check-chains": "node scripts/check-chains.mjs",
+    "check-sources": "node scripts/check-sources.mjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

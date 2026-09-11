@@ -16,7 +16,9 @@ export const AGGRESSIVE: RiskConfig = {
   maxSlippagePct: 3,
   minLiquidityUsd: 15_000,
   minVolume24hUsd: 40_000,
-  maxPairAgeMinutes: 60 * 24 * 14,
+  // 3 days. The old 14-day window let established large-caps dominate the
+  // watchlist, where a 2%/hour move never clears the consensus threshold.
+  maxPairAgeMinutes: 60 * 72,
   minConsensusScore: 55,
   dailyLossLimitPct: 35,
 };
