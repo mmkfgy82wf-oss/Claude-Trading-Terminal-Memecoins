@@ -279,6 +279,43 @@ export interface TerminalSnapshot {
   portfolio: PortfolioSnapshot;
   logs: LogEntry[];
   chainStatus: ChainStatus[];
+  diagnostics: TickDiagnostics;
+}
+
+/**
+ * Why the desk did or did not open anything this tick.
+ *
+ * An autonomous desk whose inaction you cannot read is not trustworthy, however
+ * good its logic. This is the funnel from "pairs we know about" down to "ticket
+ * sized", so a quiet desk can be told apart from a stuck one at a glance.
+ */
+export interface TickDiagnostics {
+  universeSize: number;
+  watchlistSize: number;
+  /** Where this tick's pairs came from. */
+  discovery: {
+    fromLaunchpad: number;
+    fromSearch: number;
+    addedThisCycle: number;
+    agedOut: number;
+    lastDiscoveryAt: number;
+  };
+  /** Each stage counts candidates that stopped there. */
+  funnel: {
+    considered: number;
+    vetoed: number;
+    belowScore: number;
+    alreadyHeld: number;
+    noCash: number;
+    tooSmall: number;
+    slippage: number;
+    noSlot: number;
+    sized: number;
+  };
+  /** Single-sentence answer to "why is nothing happening?", or null when trading. */
+  blocker: string | null;
+  /** Median age of the watchlist, in minutes — a stale board shows up here. */
+  medianAgeMinutes: number;
 }
 
 export interface ChainStatus {
@@ -288,4 +325,8 @@ export interface ChainStatus {
   pairsTracked: number;
   lastFetchAt: number;
   note: string;
+  /** Pairs this chain contributed from its launchpad feed last discovery. */
+  freshLaunches: number;
+  /** Pairs dropped as stale since the last poll. */
+  agedOut: number;
 }

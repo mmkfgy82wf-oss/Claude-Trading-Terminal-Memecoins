@@ -179,3 +179,71 @@ test("the age window is tight enough to exclude established coins", () => {
   const days = AGGRESSIVE.maxPairAgeMinutes / (60 * 24);
   assert.ok(days <= 7, `${days} days lets in coins that no longer move like memecoins`);
 });
+
+// ── the diagnostics funnel ────────────────────────────────────────────────
+
+test("the funnel names the consensus threshold when the board is merely quiet", async () => {
+  const stale = Array.from({ length: 6 }, (_, i) =>
+    token({
+      pairAddress: `Q${i}`,
+      ageMinutes: 60 * 10,
+      change5m: 0.4,
+      change1h: 1,
+      change24h: 3,
+      volume5mUsd: 3_000,
+    }),
+  );
+  const ctx = ctxFor(stale);
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+  const risk = new RiskAgent();
+  risk.run(ctx);
+
+  assert.equal(risk.funnel.sized, 0);
+  assert.ok(risk.funnel.considered > 0, "the funnel starts from what was actually looked at");
+  assert.ok(risk.blocker, "a quiet tick must still explain itself");
+  assert.match(risk.blocker!, /threshold|quiet/i, `unhelpful blocker: ${risk.blocker}`);
+});
+
+test("the funnel reports the position cap rather than a vague silence", async () => {
+  const ctx = ctxFor([token({ pairAddress: "GOOD" })]);
+  ctx.risk.maxOpenPositions = 0;
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+  const risk = new RiskAgent();
+  risk.run(ctx);
+
+  assert.equal(risk.funnel.sized, 0);
+  assert.match(risk.blocker ?? "", /slot/i, `expected a slot message, got: ${risk.blocker}`);
+});
+
+test("the funnel counts vetoes separately from low scores", async () => {
+  const trap = token({ pairAddress: "TRAP", buys5m: 300, sells5m: 1 });
+  const good = token({ pairAddress: "GOOD" });
+  const ctx = ctxFor([trap, good]);
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+  const risk = new RiskAgent();
+  risk.run(ctx);
+
+  assert.equal(risk.funnel.vetoed, 1, "the honeypot is counted as a veto, not a weak score");
+  assert.ok(risk.funnel.considered >= 2);
+});
+
+test("a tick that trades reports no blocker", async () => {
+  const fresh = Array.from({ length: 4 }, (_, i) =>
+    token({ pairAddress: `F${i}`, ageMinutes: 30, liquidityUsd: 90_000, change5m: 8, change1h: 30 }),
+  );
+  const ctx = ctxFor(fresh);
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+  const risk = new RiskAgent();
+  risk.run(ctx);
+
+  assert.ok(risk.funnel.sized > 0);
+  assert.equal(risk.blocker, null, "nothing is blocking when tickets are being sized");
+});

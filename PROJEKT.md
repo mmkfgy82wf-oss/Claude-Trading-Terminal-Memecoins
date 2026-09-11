@@ -176,7 +176,7 @@ Drei-Spalten-Desk auf großen Bildschirmen, einspaltig auf dem Handy. Jedes Pane
 scrollt in seinem eigenen Rahmen; die Seite selbst scrollt nie horizontal.
 
 - **Links:** Agenten-Desk (Status, aktuelle Tätigkeit, Auslastungsbalken,
-  Entscheidungszähler) + Freigabe-Queue
+  Entscheidungszähler), **Warum/Warum-nicht-Panel** und Freigabe-Queue
 - **Mitte:** Paper-Portfolio (Equity-Hero in USD, Equity-Kurve, **eine
   Treasury-Karte pro Chain mit dem echten nativen Bestand**, Kennzahlen),
   Konsens-Board (aufklappbarer Audit-Trail), offene Positionen mit sichtbarem
@@ -192,6 +192,23 @@ Statuspunkte, Scanline, Feder-animierte Balken, Fade-in neuer Log- und
 Fill-Zeilen, Flash auf neuen Fills, Layout-animierter Autonomie-Toggle,
 Slide-in-Drawer. **Alles respektiert `prefers-reduced-motion`** — dort werden
 sämtliche Animationen abgeschaltet, inklusive Überspringen der Boot-Sequenz.
+
+### Das Warum/Warum-nicht-Panel
+
+Ein autonomer Desk, dessen Untätigkeit man nicht lesen kann, ist nicht
+vertrauenswürdig — egal wie gut die Logik ist. Das Panel beantwortet deshalb
+zwei Fragen direkt:
+
+- **Woher kommen diese Token?** Frische Launches vs. Suchtreffer, wie viele neu
+  dazukamen, wie viele ausgealtert sind, Medianalter der Watchlist.
+- **Warum wurde nichts gekauft?** Der Trichter vom Board bis zum Ticket:
+  vetoed → unter Konsens-Schwelle → schon gehalten → kein Slot → Kasse leer →
+  Slippage → zu klein → dimensioniert. Darüber ein Satz, der die letzte Hürde
+  benennt, an der es hängt.
+
+Der Unterschied zwischen „der Desk ist ruhig" und „der Desk klemmt" ist von
+außen sonst nicht erkennbar. Genau diese Mehrdeutigkeit hat den Nutzer eine
+halbe Stunde gekostet.
 
 ### Farben — und warum sie so gewählt sind
 Die Agenten-/Serienfarben sind kein Bauchgefühl, sondern gegen die dunkle
@@ -209,7 +226,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 35, alle grün (`npm test`)
+### Unit-Tests — 39, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -315,5 +332,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  35 Unit-Tests
+tests/*.test.ts                  39 Unit-Tests
 ```

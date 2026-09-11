@@ -13,6 +13,7 @@ import type {
   PendingApproval,
   RiskConfig,
   TerminalSnapshot,
+  TickDiagnostics,
   Token,
 } from "@/lib/types";
 import { Blackboard } from "./blackboard";
@@ -289,6 +290,26 @@ export class Orchestrator {
       portfolio: this.wallet.snapshot(),
       logs: this.logs.slice(-120).reverse(),
       chainStatus: this.feed.statuses(),
+      diagnostics: this.diagnostics(watchlist),
+    };
+  }
+
+  private diagnostics(watchlist: Token[]): TickDiagnostics {
+    const ages = watchlist.map((t) => t.ageMinutes).sort((a, b) => a - b);
+    const median = ages.length ? ages[Math.floor(ages.length / 2)] : 0;
+
+    // A blocker the operator set outranks anything the sizing pass found.
+    const blocker = this.killSwitch
+      ? "Kill switch engaged — no new risk until you release it."
+      : this.riskAgent.blocker;
+
+    return {
+      universeSize: this.board.universe().length,
+      watchlistSize: watchlist.length,
+      discovery: this.feed.provenance(),
+      funnel: this.riskAgent.funnel,
+      blocker,
+      medianAgeMinutes: median,
     };
   }
 

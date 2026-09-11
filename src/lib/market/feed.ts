@@ -51,6 +51,9 @@ export class ChainFeed {
   /** Last time each pair came back from the upstream, for ageing out. */
   private readonly lastSeen = new Map<string, number>();
   private launchpadHits = 0;
+  private searchHits = 0;
+  private addedThisCycle = 0;
+  private agedOutThisCycle = 0;
   private readonly sim: MarketSimulator;
   private mode: MarketMode = "simulated";
   private lastDiscoveryAt = 0;
@@ -75,6 +78,8 @@ export class ChainFeed {
       pairsTracked: this.tokens.size,
       lastFetchAt: this.lastFetchAt,
       note: this.note,
+      freshLaunches: this.launchpadHits,
+      agedOut: this.agedOutThisCycle,
     };
   }
 
@@ -98,6 +103,8 @@ export class ChainFeed {
         ]);
         const found = [...launched, ...trending];
         this.launchpadHits = launched.length;
+        this.searchHits = trending.length;
+        this.addedThisCycle = found.filter((t) => !this.tokens.has(t.id)).length;
         this.lastDiscoveryAt = now;
         if (found.length === 0) {
           this.liveFailures += 1;
@@ -156,11 +163,25 @@ export class ChainFeed {
 
   private evictStale(protectedIds: Set<string> = new Set()): void {
     const keep = pruneUniverse([...this.tokens.values()], this.lastSeen, protectedIds);
+    let dropped = 0;
     for (const id of [...this.tokens.keys()]) {
       if (keep.has(id)) continue;
       this.tokens.delete(id);
       this.lastSeen.delete(id);
+      dropped += 1;
     }
+    this.agedOutThisCycle = dropped;
+  }
+
+  /** Provenance of the current universe, for the diagnostics panel. */
+  provenance(): { fromLaunchpad: number; fromSearch: number; addedThisCycle: number; agedOut: number; lastDiscoveryAt: number } {
+    return {
+      fromLaunchpad: this.launchpadHits,
+      fromSearch: this.searchHits,
+      addedThisCycle: this.addedThisCycle,
+      agedOut: this.agedOutThisCycle,
+      lastDiscoveryAt: this.lastDiscoveryAt,
+    };
   }
 
   private runSim(note: string): Token[] {
@@ -198,6 +219,23 @@ export class MarketFeed {
 
   statuses(): ChainStatus[] {
     return this.feeds.map((f) => f.status());
+  }
+
+  /** Combined discovery provenance across every chain. */
+  provenance() {
+    return this.feeds.reduce(
+      (acc, f) => {
+        const p = f.provenance();
+        return {
+          fromLaunchpad: acc.fromLaunchpad + p.fromLaunchpad,
+          fromSearch: acc.fromSearch + p.fromSearch,
+          addedThisCycle: acc.addedThisCycle + p.addedThisCycle,
+          agedOut: acc.agedOut + p.agedOut,
+          lastDiscoveryAt: Math.max(acc.lastDiscoveryAt, p.lastDiscoveryAt),
+        };
+      },
+      { fromLaunchpad: 0, fromSearch: 0, addedThisCycle: 0, agedOut: 0, lastDiscoveryAt: 0 },
+    );
   }
 
   /** live when any chain is live — the UI badge reflects the best available. */

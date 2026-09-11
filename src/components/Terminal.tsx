@@ -7,6 +7,7 @@ import { AgentConsole } from "./AgentConsole";
 import { ApprovalQueue } from "./ApprovalQueue";
 import { BootSequence } from "./BootSequence";
 import { ChainStatusBar } from "./ChainStatusBar";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { FillsTape } from "./FillsTape";
 import { PortfolioPanel } from "./PortfolioPanel";
 import { PositionsPanel } from "./PositionsPanel";
@@ -52,6 +53,11 @@ export function Terminal() {
           >
             <div className="flex min-h-0 min-w-0 flex-col gap-2">
               <AgentConsole agents={snapshot.agents} tick={snapshot.tick} className="xl:flex-[3]" />
+              <DiagnosticsPanel
+                diagnostics={snapshot.diagnostics}
+                chainStatus={snapshot.chainStatus}
+                className="xl:flex-[3]"
+              />
               <ApprovalQueue
                 approvals={snapshot.approvals}
                 autonomy={snapshot.flags.autonomy}
