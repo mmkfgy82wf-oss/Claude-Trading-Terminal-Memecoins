@@ -171,6 +171,10 @@ getrennt.
 
 ## 3. Die Oberfläche
 
+> Panel für Panel, mit der Bedeutung jeder einzelnen Zahl:
+> **[docs/TERMINAL.md](docs/TERMINAL.md)**. Der folgende Abschnitt beschreibt
+> nur den Aufbau und die Gestaltungsentscheidungen.
+
 ### Layout
 Drei-Spalten-Desk auf großen Bildschirmen, einspaltig auf dem Handy. Jedes Panel
 scrollt in seinem eigenen Rahmen; die Seite selbst scrollt nie horizontal.

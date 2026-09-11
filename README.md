@@ -42,7 +42,7 @@ Ohne Keys läuft alles vollständig — nur mit weniger Signalquellen.
 npm run dev        # Entwicklungsserver
 npm run build      # Produktions-Build
 npm start          # Produktionsserver
-npm test           # Unit-Tests (21)
+npm test           # Unit-Tests (39)
 npm run typecheck  # TypeScript ohne Emit
 npm run check-sources # prüft alle Datenquellen von deinem Netz aus
 npm run check-chains  # zeigt, welche Chains gerade live indiziert sind
@@ -84,4 +84,9 @@ Transaktion signiert. Die Live-Execution-Schicht (`LiveSolanaExecutor`) ist
 bewusst funktionslos und verweigert die Arbeit, solange kein Signer *und* ein
 expliziter Opt-in-Flag gesetzt sind.
 
-Vollständige Dokumentation: **[PROJEKT.md](PROJEKT.md)**
+## Dokumentation
+
+| Datei | Inhalt |
+|---|---|
+| **[docs/TERMINAL.md](docs/TERMINAL.md)** | **Die Oberfläche lesen** — was pro Tick passiert, jedes Panel, jede Zahl, jeder Marker, plus Symptom→Ursache-Tabelle |
+| [PROJEKT.md](PROJEKT.md) | Architektur, Agenten, Entscheidungen, Tests, bekannte Grenzen |
