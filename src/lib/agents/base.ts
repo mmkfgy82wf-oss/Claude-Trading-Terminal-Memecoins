@@ -17,7 +17,6 @@ export interface AgentContext {
   wallet: PaperWallet;
   risk: RiskConfig;
   flags: EngineFlags;
-  solPriceUsd: number;
   log: (level: LogLevel, message: string, extra?: { tokenSymbol?: string; meta?: Record<string, string | number | boolean> }) => void;
 }
 

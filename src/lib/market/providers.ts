@@ -102,14 +102,32 @@ export async function fetchMintIntel(token: Token): Promise<MintIntel | null> {
   }
 }
 
-/** SOL/USD, used to express the paper portfolio in SOL. Falls back to a constant. */
-export async function fetchSolPrice(fallback = 180): Promise<number> {
+/** Deepest-pool USD price for a token address, or null when unavailable. */
+async function priceForToken(address: string): Promise<number | null> {
   const data = await safeJson<{ pairs?: { priceUsd?: string; liquidity?: { usd?: number } }[] }>(
-    "https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112",
+    `https://api.dexscreener.com/latest/dex/tokens/${address}`,
   );
   const best = data?.pairs
     ?.filter((p) => Number(p.priceUsd) > 0)
     .sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
   const price = Number(best?.priceUsd);
-  return Number.isFinite(price) && price > 0 ? price : fallback;
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+const WSOL = "So11111111111111111111111111111111111111112";
+const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+
+/**
+ * USD price of each chain's quote asset. The book is held per chain in its own
+ * asset, so one global rate would misprice every position on the other chain.
+ */
+export async function fetchQuotePrices(
+  fallback: { solana: number; robinhood: number },
+): Promise<{ solana: number; robinhood: number }> {
+  const [sol, eth] = await Promise.all([priceForToken(WSOL), priceForToken(WETH)]);
+  return {
+    solana: sol ?? fallback.solana,
+    // Robinhood Chain settles in ETH, so it is priced off ETH, not SOL.
+    robinhood: eth ?? fallback.robinhood,
+  };
 }

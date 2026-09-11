@@ -5,8 +5,10 @@ export interface ChainAdapter {
   label: string;
   /** Short tag rendered in the UI. */
   tag: string;
-  /** Native gas/quote asset. */
+  /** Native gas/quote asset — what a position on this chain is actually paid for in. */
   native: string;
+  /** Per-trade cost model for this chain, in native units. */
+  fee: { rate: number; flat: number };
   /** DexScreener's chain slug, when the chain is indexed there. */
   dexscreenerSlug: string | null;
   /** Search terms used to discover trending pairs on this chain. */
@@ -27,6 +29,8 @@ export const CHAINS: Record<ChainId, ChainAdapter> = {
     label: "Solana",
     tag: "SOL",
     native: "SOL",
+    // DEX fee plus a priority fee large enough to land in a contested block.
+    fee: { rate: 0.0025, flat: 0.00045 },
     dexscreenerSlug: "solana",
     discoveryQueries: ["SOL", "pump", "bonk", "wif", "moon"],
     explorer: (a) => `https://solscan.io/account/${a}`,
@@ -38,6 +42,8 @@ export const CHAINS: Record<ChainId, ChainAdapter> = {
     label: "Robinhood Chain",
     tag: "RHC",
     native: "ETH",
+    // L2 gas is cheap in absolute terms but ETH is worth ~20x SOL per unit.
+    fee: { rate: 0.003, flat: 0.000012 },
     // Robinhood Chain is a young Arbitrum-Orbit L2. If/when DexScreener indexes
     // it under this slug the adapter starts returning live pairs automatically;
     // until then the probe fails and the chain falls back to the simulator.

@@ -68,7 +68,7 @@ export function ApprovalQueue({
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold">{approval.symbol}</span>
                     <span className="tabular text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                      BUY {approval.sizeSol.toFixed(3)} SOL
+                      BUY {approval.sizeNative.toFixed(4)} {approval.quote}
                     </span>
                     <span className="tabular ml-auto text-[10px]" style={{ color: "var(--text-muted)" }}>
                       {(remaining / 1000).toFixed(0)}s

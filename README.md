@@ -4,6 +4,10 @@ Ein autonomes Multi-Agenten-Trading-Terminal für Memecoins. Sechs Agenten
 beobachten den Markt gemeinsam, stimmen über Kandidaten ab und handeln
 eigenständig — als **Paper-Trading auf echten On-Chain-Daten**.
 
+Das Buch wird **pro Chain in deren eigenem Quote-Asset** geführt: Solana-Paare
+in SOL, Robinhood-Chain-Paare in ETH. Kapital wandert nicht von selbst zwischen
+Chains, und das Terminal tut auch nicht so.
+
 ![Terminal](docs/screenshot-desktop.png)
 
 ## Schnellstart
@@ -38,7 +42,7 @@ Ohne Keys läuft alles vollständig — nur mit weniger Signalquellen.
 npm run dev        # Entwicklungsserver
 npm run build      # Produktions-Build
 npm start          # Produktionsserver
-npm test           # Unit-Tests (17)
+npm test           # Unit-Tests (21)
 npm run typecheck  # TypeScript ohne Emit
 ```
 

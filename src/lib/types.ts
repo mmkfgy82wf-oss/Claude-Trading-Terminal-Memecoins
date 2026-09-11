@@ -117,8 +117,10 @@ export interface TradeIntent {
   symbol: string;
   chain: ChainId;
   side: TradeSide;
-  /** Notional in SOL. */
-  sizeSol: number;
+  /** Notional in the chain's own quote asset (SOL on Solana, ETH on an L2). */
+  sizeNative: number;
+  /** Ticker of that quote asset, so the UI never mislabels a ticket. */
+  quote: string;
   reason: string;
   consensusScore: number;
   confidence: number;
@@ -142,7 +144,9 @@ export interface Position {
   /** Units of the memecoin held. */
   quantity: number;
   entryPriceUsd: number;
-  costSol: number;
+  /** Cost basis in the chain's quote asset. */
+  costNative: number;
+  quote: string;
   openedAt: number;
   stopLossPct: number;
   takeProfitLadder: number[];
@@ -152,7 +156,8 @@ export interface Position {
   peakPriceUsd: number;
   trailingStopPct: number;
   currentPriceUsd: number;
-  unrealizedPnlSol: number;
+  unrealizedPnlNative: number;
+  unrealizedPnlUsd: number;
   unrealizedPnlPct: number;
 }
 
@@ -164,10 +169,13 @@ export interface Fill {
   side: TradeSide;
   quantity: number;
   priceUsd: number;
-  valueSol: number;
-  feeSol: number;
+  /** Value and fee in the chain's quote asset. */
+  valueNative: number;
+  feeNative: number;
+  quote: string;
   slippagePct: number;
-  realizedPnlSol?: number;
+  realizedPnlNative?: number;
+  realizedPnlUsd?: number;
   reason: string;
   at: number;
   /** Mirrors how a real executor would report a signature. */
@@ -175,23 +183,47 @@ export interface Fill {
   mode: "paper" | "live";
 }
 
+/**
+ * A chain's own book. Capital does not move between chains by itself, so each
+ * one holds its own cash in its own quote asset — a SOL balance cannot pay for
+ * a trade on an L2 whose gas and quote asset are ETH.
+ */
+export interface ChainTreasury {
+  chain: ChainId;
+  label: string;
+  /** Quote asset ticker, e.g. SOL or ETH. */
+  quote: string;
+  quotePriceUsd: number;
+  /** Free cash, in quote units. */
+  cashNative: number;
+  /** Open positions marked to market, in quote units. */
+  positionsValueNative: number;
+  equityNative: number;
+  equityUsd: number;
+  openPositions: number;
+}
+
+/**
+ * The book as a whole. Aggregates are in USD because it is the only unit that
+ * is meaningful across chains; each chain's own balance stays native.
+ */
 export interface PortfolioSnapshot {
-  cashSol: number;
-  positionsValueSol: number;
-  equitySol: number;
-  startingEquitySol: number;
-  realizedPnlSol: number;
-  unrealizedPnlSol: number;
+  treasuries: ChainTreasury[];
+  cashUsd: number;
+  positionsValueUsd: number;
+  equityUsd: number;
+  startingEquityUsd: number;
+  realizedPnlUsd: number;
+  unrealizedPnlUsd: number;
   totalPnlPct: number;
   openPositions: number;
   wins: number;
   losses: number;
   winRate: number;
-  bestTradeSol: number;
-  worstTradeSol: number;
+  bestTradeUsd: number;
+  worstTradeUsd: number;
+  /** Equity in USD over the session. */
   equityCurve: PricePoint[];
-  /** USD price of SOL used for conversions. */
-  solPriceUsd: number;
 }
 
 export type LogLevel = "info" | "signal" | "trade" | "warn" | "error" | "system";
@@ -207,7 +239,8 @@ export interface LogEntry {
 }
 
 export interface RiskConfig {
-  startingCapitalSol: number;
+  /** Total book funding in USD, split evenly across the active chains. */
+  startingCapitalUsd: number;
   maxPositionPct: number;
   maxOpenPositions: number;
   maxPortfolioExposurePct: number;

@@ -8,9 +8,13 @@ import { RiskAgent } from "../src/lib/agents/risk";
 import type { AgentContext } from "../src/lib/agents/base";
 import { PaperWallet } from "../src/lib/trading/wallet";
 import { AGGRESSIVE } from "../src/lib/trading/risk";
-import type { Token } from "../src/lib/types";
+import type { ChainId, Token } from "../src/lib/types";
 
 const SOL = 180;
+const ETH = 3200;
+const PRICES = { solana: SOL, robinhood: ETH };
+const ACTIVE: ChainId[] = ["solana", "robinhood"];
+const BOOK_USD = 10 * SOL * ACTIVE.length;
 
 function token(overrides: Partial<Token> = {}): Token {
   const base: Token = {
@@ -40,7 +44,10 @@ function token(overrides: Partial<Token> = {}): Token {
   return { ...base, id: `solana:${base.symbol}` };
 }
 
-function makeCtx(tokens: Token[], wallet = new PaperWallet(10)): AgentContext & { board: Blackboard } {
+function makeCtx(
+  tokens: Token[],
+  wallet = new PaperWallet(BOOK_USD, ACTIVE, PRICES),
+): AgentContext & { board: Blackboard } {
   const board = new Blackboard();
   board.setUniverse(tokens);
   return {
@@ -52,11 +59,10 @@ function makeCtx(tokens: Token[], wallet = new PaperWallet(10)): AgentContext & 
       autonomy: "auto",
       killSwitch: false,
       marketMode: "simulated",
-      chains: ["solana"],
+      chains: ACTIVE,
       narrativeAugmented: false,
       providers: { birdeye: false, helius: false, anthropic: false },
     },
-    solPriceUsd: SOL,
     log: () => {},
   };
 }
@@ -146,14 +152,19 @@ test("RISK keeps every ticket inside the per-position and exposure caps", async 
   const risk = new RiskAgent();
   risk.run(ctx);
 
-  const equity = ctx.wallet.snapshot(SOL).equitySol;
-  const cap = equity * (ctx.risk.maxPositionPct / 100);
+  const equityUsd = ctx.wallet.snapshot().equityUsd;
+  const capUsd = equityUsd * (ctx.risk.maxPositionPct / 100);
   assert.ok(risk.pending.length > 0, "a clean, liquid, trending universe should produce tickets");
   for (const intent of risk.pending) {
-    assert.ok(intent.sizeSol <= cap + 1e-9, `${intent.sizeSol} exceeds the ${cap} per-position cap`);
+    const usd = intent.sizeNative * ctx.wallet.quotePrice(intent.chain);
+    assert.ok(usd <= capUsd + 1e-6, `$${usd} exceeds the $${capUsd} per-position cap`);
   }
-  const total = risk.pending.reduce((s, i) => s + i.sizeSol, 0);
-  assert.ok(total <= equity * (ctx.risk.maxPortfolioExposurePct / 100) + 1e-9, "exposure cap holds across tickets");
+  // Exposure is capped per chain, so the whole batch must fit inside the book's cap too.
+  const totalUsd = risk.pending.reduce((sum, i) => sum + i.sizeNative * ctx.wallet.quotePrice(i.chain), 0);
+  assert.ok(
+    totalUsd <= equityUsd * (ctx.risk.maxPortfolioExposurePct / 100) + 1e-6,
+    "exposure cap holds across tickets",
+  );
   assert.ok(risk.pending.length <= ctx.risk.maxOpenPositions);
 });
 
@@ -169,18 +180,20 @@ test("the kill switch stops RISK from opening anything", async () => {
 });
 
 test("RISK halts new entries once the daily loss limit is breached", async () => {
-  const wallet = new PaperWallet(10);
-  // Manufacture a drawdown past the limit.
+  const wallet = new PaperWallet(BOOK_USD, ACTIVE, PRICES);
+  // Manufacture a drawdown past the limit: lose most of the book in USD terms.
+  const lossNative = (BOOK_USD * 0.5) / SOL;
   wallet.applyBuy(
     { id: "a", tokenId: "solana:GOOD", symbol: "GOOD", chain: "solana", side: "buy", quantity: 1000,
-      priceUsd: 0.001, valueSol: 6, feeSol: 0.01, slippagePct: 0.4, reason: "t", at: Date.now(),
-      txRef: "paper-a", mode: "paper" },
+      priceUsd: 0.001, valueNative: lossNative, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
+      reason: "t", at: Date.now(), txRef: "paper-a", mode: "paper" },
     AGGRESSIVE,
   );
   wallet.applySell(
     { id: "b", tokenId: "solana:GOOD", symbol: "GOOD", chain: "solana", side: "sell", quantity: 1000,
-      priceUsd: 0.0001, valueSol: 0.6, feeSol: 0.01, slippagePct: 0.4, realizedPnlSol: -5.4, reason: "sl",
-      at: Date.now(), txRef: "paper-b", mode: "paper" },
+      priceUsd: 0.0001, valueNative: 0.05, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
+      realizedPnlNative: -(lossNative - 0.05), realizedPnlUsd: -(lossNative - 0.05) * SOL,
+      reason: "sl", at: Date.now(), txRef: "paper-b", mode: "paper" },
     false,
   );
 
@@ -191,4 +204,41 @@ test("RISK halts new entries once the daily loss limit is breached", async () =>
   const risk = new RiskAgent();
   risk.run(ctx);
   assert.equal(risk.pending.length, 0, "past the daily loss limit the desk stops opening risk");
+});
+
+test("every ticket is quoted in its own chain's asset and paid from that treasury", async () => {
+  const sol = token({ symbol: "SOLCOIN" });
+  const rhc = token({ symbol: "RHCCOIN", chain: "robinhood" });
+  const ctx = makeCtx([sol, rhc]);
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+
+  const risk = new RiskAgent();
+  risk.run(ctx);
+  assert.ok(risk.pending.length >= 1, "both candidates are tradable");
+
+  for (const intent of risk.pending) {
+    const expected = intent.chain === "solana" ? "SOL" : "ETH";
+    assert.equal(intent.quote, expected, `${intent.symbol} on ${intent.chain} must be quoted in ${expected}`);
+    // The ticket has to fit the treasury it will actually be paid from.
+    assert.ok(
+      intent.sizeNative <= ctx.wallet.cashOn(intent.chain),
+      "a ticket can never exceed its own chain's cash",
+    );
+  }
+});
+
+test("a chain with an empty treasury produces no tickets, however bullish it looks", async () => {
+  // Fund Solana only; the Robinhood treasury starts at zero.
+  const wallet = new PaperWallet(BOOK_USD, ["solana"], PRICES);
+  const rhc = token({ symbol: "RHCONLY", chain: "robinhood" });
+  const ctx = makeCtx([rhc], wallet);
+  new ScoutAgent().run(ctx);
+  await new SentinelAgent().run(ctx);
+  new QuantAgent().run(ctx);
+
+  const risk = new RiskAgent();
+  risk.run(ctx);
+  assert.equal(risk.pending.length, 0, "SOL cannot pay for an ETH-quoted pair on another chain");
 });

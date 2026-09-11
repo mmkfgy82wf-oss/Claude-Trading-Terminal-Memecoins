@@ -51,7 +51,7 @@ export class ExecutorAgent extends Agent {
     }
     if (ctx.flags.killSwitch) return false;
 
-    const result = await this.executor.buy(intent, token, ctx.solPriceUsd, ctx.risk);
+    const result = await this.executor.buy(intent, token, ctx.wallet.quotePrice(token.chain), ctx.risk);
     if (!result.ok || !result.fill) {
       ctx.log("warn", `entry rejected for ${intent.symbol}: ${result.error ?? "unknown"}`, {
         tokenSymbol: intent.symbol,
@@ -61,10 +61,14 @@ export class ExecutorAgent extends Agent {
 
     const position = ctx.wallet.applyBuy(result.fill, ctx.risk);
     this.acted(`bought ${intent.symbol}`);
-    ctx.log("trade", `BUY ${intent.symbol} · ${result.fill.valueSol.toFixed(3)} SOL @ $${result.fill.priceUsd.toPrecision(4)} · slip ${result.fill.slippagePct.toFixed(2)}%`, {
-      tokenSymbol: intent.symbol,
-      meta: { sizeSol: result.fill.valueSol, score: intent.consensusScore, positionId: position.id },
-    });
+    ctx.log(
+      "trade",
+      `BUY ${intent.symbol} · ${result.fill.valueNative.toFixed(4)} ${result.fill.quote} @ $${result.fill.priceUsd.toPrecision(4)} · slip ${result.fill.slippagePct.toFixed(2)}%`,
+      {
+        tokenSymbol: intent.symbol,
+        meta: { size: result.fill.valueNative, quote: result.fill.quote, score: intent.consensusScore, positionId: position.id },
+      },
+    );
     return true;
   }
 
@@ -170,7 +174,7 @@ export class ExecutorAgent extends Agent {
       token,
       fraction,
       reason,
-      ctx.solPriceUsd,
+      ctx.wallet.quotePrice(position.chain),
       ctx.risk,
     );
     if (!result.ok || !result.fill) {
@@ -181,11 +185,12 @@ export class ExecutorAgent extends Agent {
     }
 
     ctx.wallet.applySell(result.fill, rung);
-    const pnl = result.fill.realizedPnlSol ?? 0;
-    ctx.log(pnl >= 0 ? "trade" : "warn", `SELL ${position.symbol} · ${(fraction * 100).toFixed(0)}% · ${pnl >= 0 ? "▲ +" : "▼ "}${pnl.toFixed(3)} SOL · ${reason}`, {
-      tokenSymbol: position.symbol,
-      meta: { pnlSol: pnl, fraction },
-    });
+    const pnl = result.fill.realizedPnlNative ?? 0;
+    ctx.log(
+      pnl >= 0 ? "trade" : "warn",
+      `SELL ${position.symbol} · ${(fraction * 100).toFixed(0)}% · ${pnl >= 0 ? "▲ +" : "▼ "}${pnl.toFixed(4)} ${result.fill.quote} · ${reason}`,
+      { tokenSymbol: position.symbol, meta: { pnl, quote: result.fill.quote, fraction } },
+    );
     return true;
   }
 }

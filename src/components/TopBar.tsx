@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { TerminalSnapshot } from "@/lib/types";
-import { arrow, formatPct, formatSol } from "@/lib/util/format";
+import { arrow, formatCompactUsd, formatPct } from "@/lib/util/format";
 import type { ConnectionState } from "@/lib/useTerminal";
 import { Pill } from "./ui";
 
@@ -75,7 +75,7 @@ export function TopBar({
           <span className="text-[9px] uppercase tracking-[0.16em]" style={{ color: "var(--text-muted)" }}>
             equity
           </span>
-          <span className="text-[14px] font-semibold">{formatSol(portfolio.equitySol, 3)} SOL</span>
+          <span className="text-[14px] font-semibold">{formatCompactUsd(portfolio.equityUsd)}</span>
           <span
             className="text-[11px] font-semibold"
             style={{ color: pnlPositive ? "var(--pos-glow)" : "var(--neg-glow)" }}

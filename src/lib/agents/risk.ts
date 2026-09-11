@@ -1,5 +1,6 @@
+import { CHAINS } from "@/lib/market/chains";
 import { estimateSlippagePct } from "@/lib/trading/executor";
-import type { TradeIntent } from "@/lib/types";
+import type { ChainId, TradeIntent } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
 
 let intentSeq = 0;
@@ -24,14 +25,14 @@ export class RiskAgent extends Agent {
   run(ctx: AgentContext): void {
     this.pending.length = 0;
     const { risk, wallet, flags } = ctx;
-    const snapshot = wallet.snapshot(ctx.solPriceUsd);
+    const snapshot = wallet.snapshot();
 
     if (flags.killSwitch) {
       this.blocked("KILL SWITCH — no new risk");
       return;
     }
 
-    const drawdown = wallet.dailyDrawdownPct(ctx.solPriceUsd);
+    const drawdown = wallet.dailyDrawdownPct();
     if (drawdown >= risk.dailyLossLimitPct) {
       this.blocked(`daily loss limit hit (-${drawdown.toFixed(1)}%)`);
       if (!ctx.board.readNote("risk:dailyLimit")) {
@@ -42,7 +43,7 @@ export class RiskAgent extends Agent {
     }
     ctx.board.note("risk:dailyLimit", "");
 
-    const exposurePct = (snapshot.positionsValueSol / Math.max(1e-9, snapshot.equitySol)) * 100;
+    const exposurePct = (snapshot.positionsValueUsd / Math.max(1e-9, snapshot.equityUsd)) * 100;
     this.working(`exposure ${exposurePct.toFixed(0)}% / ${risk.maxPortfolioExposurePct}%`, exposurePct / 100);
 
     if (snapshot.openPositions >= risk.maxOpenPositions) {
@@ -54,14 +55,22 @@ export class RiskAgent extends Agent {
       return;
     }
 
-    // Headroom and cash are consumed as tickets are issued: sizing every
-    // candidate against the same starting headroom would let one tick's batch
-    // blow through the exposure cap in aggregate.
-    let headroomSol = Math.max(
-      0,
-      (snapshot.equitySol * risk.maxPortfolioExposurePct) / 100 - snapshot.positionsValueSol,
-    );
-    let cashSol = wallet.cash;
+    // Headroom and cash are tracked per chain and consumed as tickets are
+    // issued. A candidate on one chain can only ever be paid for out of that
+    // chain's own treasury — its quote asset does not exist on the other.
+    const headroomUsd = new Map<ChainId, number>();
+    const cashNative = new Map<ChainId, number>();
+    for (const treasury of snapshot.treasuries) {
+      headroomUsd.set(
+        treasury.chain,
+        Math.max(
+          0,
+          (treasury.equityUsd * risk.maxPortfolioExposurePct) / 100 -
+            treasury.positionsValueNative * treasury.quotePriceUsd,
+        ),
+      );
+      cashNative.set(treasury.chain, treasury.cashNative);
+    }
     const slots = risk.maxOpenPositions - snapshot.openPositions;
 
     const candidates = ctx.board
@@ -75,26 +84,43 @@ export class RiskAgent extends Agent {
       const token = ctx.board.token(candidate.tokenId);
       if (!token) continue;
 
-      // Size scales with conviction, then gets clamped by every hard cap.
-      const convictionFactor = 0.45 + 0.55 * Math.min(1, (candidate.score - risk.minConsensusScore) / 35);
-      let sizeSol = snapshot.equitySol * (risk.maxPositionPct / 100) * convictionFactor * candidate.confidence;
-      sizeSol = Math.min(sizeSol, headroomSol, cashSol * 0.9);
+      const chain = token.chain;
+      const quote = CHAINS[chain].native;
+      const quotePriceUsd = wallet.quotePrice(chain);
+      const chainHeadroomUsd = headroomUsd.get(chain) ?? 0;
+      const chainCash = cashNative.get(chain) ?? 0;
 
-      // Never take a ticket the pool cannot absorb inside the slippage budget.
-      const maxByLiquidity = (token.liquidityUsd * 0.01) / ctx.solPriceUsd;
-      sizeSol = Math.min(sizeSol, maxByLiquidity);
-      sizeSol = Math.floor(sizeSol * 1000) / 1000;
-
-      if (sizeSol < 0.01) {
+      if (chainCash <= 0) {
         ctx.board.publish(
-          this.signal(token.id, -20, 0.6, "too small to take", [
-            `max ticket ${(maxByLiquidity).toFixed(3)} SOL vs pool $${Math.round(token.liquidityUsd).toLocaleString("en-US")}`,
+          this.signal(token.id, -10, 0.7, `no ${quote} on ${CHAINS[chain].label}`, [
+            `treasury for this chain is empty — a ${quote} pair cannot be paid for from another chain`,
           ]),
         );
         continue;
       }
 
-      const projected = estimateSlippagePct(sizeSol * ctx.solPriceUsd, token.liquidityUsd);
+      // Size scales with conviction, then gets clamped by every hard cap.
+      const convictionFactor = 0.45 + 0.55 * Math.min(1, (candidate.score - risk.minConsensusScore) / 35);
+      let sizeUsd =
+        snapshot.equityUsd * (risk.maxPositionPct / 100) * convictionFactor * candidate.confidence;
+      sizeUsd = Math.min(sizeUsd, chainHeadroomUsd, chainCash * quotePriceUsd * 0.9);
+
+      // Never take a ticket the pool cannot absorb inside the slippage budget.
+      sizeUsd = Math.min(sizeUsd, token.liquidityUsd * 0.01);
+
+      let sizeNative = sizeUsd / Math.max(1e-9, quotePriceUsd);
+      sizeNative = Math.floor(sizeNative * 1e6) / 1e6;
+
+      if (sizeNative <= 0 || sizeNative * quotePriceUsd < 1) {
+        ctx.board.publish(
+          this.signal(token.id, -20, 0.6, "too small to take", [
+            `max ticket $${sizeUsd.toFixed(2)} against a $${Math.round(token.liquidityUsd).toLocaleString("en-US")} pool`,
+          ]),
+        );
+        continue;
+      }
+
+      const projected = estimateSlippagePct(sizeNative * quotePriceUsd, token.liquidityUsd);
       if (projected > risk.maxSlippagePct) {
         ctx.board.publish(
           this.signal(token.id, -15, 0.65, "slippage over budget", [
@@ -108,21 +134,22 @@ export class RiskAgent extends Agent {
         id: intentId(),
         tokenId: token.id,
         symbol: token.symbol,
-        chain: token.chain,
+        chain,
         side: "buy",
-        sizeSol,
+        sizeNative,
+        quote,
         reason: `consensus ${candidate.score.toFixed(0)} · conf ${(candidate.confidence * 100).toFixed(0)}%`,
         consensusScore: candidate.score,
         confidence: candidate.confidence,
         createdAt: Date.now(),
       });
 
-      headroomSol -= sizeSol;
-      cashSol -= sizeSol;
+      headroomUsd.set(chain, chainHeadroomUsd - sizeNative * quotePriceUsd);
+      cashNative.set(chain, chainCash - sizeNative);
 
       ctx.board.publish(
         this.signal(token.id, 60, candidate.confidence, "sized", [
-          `${sizeSol.toFixed(3)} SOL (${((sizeSol / snapshot.equitySol) * 100).toFixed(1)}% of equity)`,
+          `${sizeNative.toFixed(4)} ${quote} (${((sizeNative * quotePriceUsd) / snapshot.equityUsd * 100).toFixed(1)}% of book)`,
           `projected slippage ${projected.toFixed(2)}%`,
         ]),
       );

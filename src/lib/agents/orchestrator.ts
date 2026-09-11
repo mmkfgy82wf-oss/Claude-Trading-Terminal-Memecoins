@@ -1,8 +1,8 @@
 import { MarketFeed } from "@/lib/market/feed";
-import { fetchSolPrice, providerFlags } from "@/lib/market/providers";
+import { fetchQuotePrices, providerFlags } from "@/lib/market/providers";
 import { PaperExecutor } from "@/lib/trading/executor";
 import { AGGRESSIVE, sanitizeRisk } from "@/lib/trading/risk";
-import { PaperWallet } from "@/lib/trading/wallet";
+import { PaperWallet, type QuotePrices } from "@/lib/trading/wallet";
 import type {
   AgentId,
   AutonomyMode,
@@ -57,7 +57,8 @@ export class Orchestrator {
   private approvals: PendingApproval[] = [];
   private logs: LogEntry[] = [];
   private tick = 0;
-  private solPriceUsd = 180;
+  /** USD price of each chain's own quote asset (SOL / ETH). */
+  private quotePrices: QuotePrices = { solana: 180, robinhood: 3200 };
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running = false;
   private ticking = false;
@@ -65,10 +66,13 @@ export class Orchestrator {
   private lastSnapshot: TerminalSnapshot | null = null;
 
   constructor() {
-    this.wallet = new PaperWallet(this.risk.startingCapitalSol);
+    this.wallet = new PaperWallet(this.risk.startingCapitalUsd, this.chains, this.quotePrices);
     const preference = (process.env.MARKET_MODE as "live" | "simulated" | "auto") ?? "auto";
     this.feed = new MarketFeed(this.chains, preference);
-    this.log("system", "Terminal cold start — paper wallet funded with " + this.risk.startingCapitalSol + " SOL");
+    this.log(
+      "system",
+      `Terminal cold start — $${this.risk.startingCapitalUsd.toLocaleString("en-US")} split across ${this.chains.length} chain treasuries`,
+    );
   }
 
   // ── lifecycle ───────────────────────────────────────────────────────────
@@ -105,13 +109,16 @@ export class Orchestrator {
     try {
       this.tick += 1;
 
-      // SOL/USD is only needed for display and sizing — refresh it slowly.
-      if (this.tick % 15 === 1) this.solPriceUsd = await fetchSolPrice(this.solPriceUsd);
+      // Quote-asset prices move slowly relative to memecoins — refresh rarely.
+      if (this.tick % 15 === 1) {
+        this.quotePrices = await fetchQuotePrices(this.quotePrices);
+        this.wallet.setPrices(this.quotePrices);
+      }
 
       const tokens = await this.feed.poll();
       this.board.setUniverse(tokens);
       const byId = new Map<string, Token>(tokens.map((t) => [t.id, t]));
-      this.wallet.markToMarket(byId, this.solPriceUsd);
+      this.wallet.markToMarket(byId);
 
       // Pipeline order matters: discovery → safety → signal → story → sizing.
       this.scout.run(this.context("scout"));
@@ -155,7 +162,7 @@ export class Orchestrator {
       ].slice(0, 40);
       this.log(
         "signal",
-        `APPROVAL REQUIRED · ${intent.symbol} · ${intent.sizeSol.toFixed(3)} SOL · ${intent.reason}`,
+        `APPROVAL REQUIRED · ${intent.symbol} · ${intent.sizeNative.toFixed(4)} ${intent.quote} · ${intent.reason}`,
         intent.symbol,
         undefined,
         "risk",
@@ -178,7 +185,6 @@ export class Orchestrator {
       wallet: this.wallet,
       risk: this.risk,
       flags: this.flags(),
-      solPriceUsd: this.solPriceUsd,
       log: (level, message, extra) => this.log(level, message, extra?.tokenSymbol, extra?.meta, agent),
     };
   }
@@ -233,9 +239,12 @@ export class Orchestrator {
   updateRisk(patch: Partial<RiskConfig>): void {
     const before = this.risk;
     this.risk = sanitizeRisk(this.risk, patch);
-    if (patch.startingCapitalSol != null && this.risk.startingCapitalSol !== before.startingCapitalSol) {
-      this.wallet.resetTo(this.risk.startingCapitalSol);
-      this.log("system", `Paper wallet reset to ${this.risk.startingCapitalSol} SOL`);
+    if (patch.startingCapitalUsd != null && this.risk.startingCapitalUsd !== before.startingCapitalUsd) {
+      this.wallet.resetTo(this.risk.startingCapitalUsd);
+      this.log(
+        "system",
+        `Book reset to $${this.risk.startingCapitalUsd.toLocaleString("en-US")} across ${this.chains.length} chain treasuries`,
+      );
     }
     this.log("system", "Risk parameters updated");
     this.emit();
@@ -274,7 +283,7 @@ export class Orchestrator {
       positions: this.wallet.openPositions(),
       fills: this.wallet.recentFills(40),
       approvals: this.approvals.slice(0, 12),
-      portfolio: this.wallet.snapshot(this.solPriceUsd),
+      portfolio: this.wallet.snapshot(),
       logs: this.logs.slice(-120).reverse(),
       chainStatus: this.feed.statuses(),
     };

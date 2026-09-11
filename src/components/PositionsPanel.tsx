@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { Position } from "@/lib/types";
-import { arrow, formatPct, formatSol, formatUsdPrice, relativeTime } from "@/lib/util/format";
+import { CHAINS } from "@/lib/market/chains";
+import { arrow, formatNative, formatPct, formatUsdPrice, relativeTime } from "@/lib/util/format";
 import { EmptyState, Panel } from "./ui";
 
 /**
@@ -54,14 +55,21 @@ export function PositionsPanel({
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold">{position.symbol}</span>
+                    <span
+                      className="rounded px-1 text-[8px] uppercase tracking-wider"
+                      style={{ color: "var(--text-muted)", border: "1px solid var(--grid-line)" }}
+                      title={CHAINS[position.chain].label}
+                    >
+                      {CHAINS[position.chain].tag}
+                    </span>
                     <span className="tabular text-[10px]" style={{ color: "var(--text-muted)" }}>
-                      {position.costSol.toFixed(3)} SOL @ {formatUsdPrice(position.entryPriceUsd)}
+                      {position.costNative.toFixed(4)} {position.quote} @ {formatUsdPrice(position.entryPriceUsd)}
                     </span>
                     <span className="tabular ml-auto text-[12px] font-bold" style={{ color: up ? "var(--pos-glow)" : "var(--neg-glow)" }}>
                       {arrow(position.unrealizedPnlPct)} {formatPct(position.unrealizedPnlPct)}
                     </span>
-                    <span className="tabular w-16 text-right text-[10px]" style={{ color: up ? "var(--pos)" : "var(--neg)" }}>
-                      {formatSol(position.unrealizedPnlSol)} SOL
+                    <span className="tabular w-24 text-right text-[10px]" style={{ color: up ? "var(--pos)" : "var(--neg)" }}>
+                      {formatNative(position.unrealizedPnlNative, position.quote)}
                     </span>
                     <button
                       type="button"

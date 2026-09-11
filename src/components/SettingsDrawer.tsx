@@ -12,8 +12,8 @@ interface Field {
 }
 
 const FIELDS: Field[] = [
-  { key: "startingCapitalSol", label: "starting capital (SOL)", hint: "changing this resets the paper wallet", step: 0.5 },
-  { key: "maxPositionPct", label: "max position (% equity)", hint: "per-name ceiling before conviction scaling" },
+  { key: "startingCapitalUsd", label: "book size ($)", hint: "split evenly across the chain treasuries; changing it resets the book", step: 100 },
+  { key: "maxPositionPct", label: "max position (% book)", hint: "per-name ceiling before conviction scaling" },
   { key: "maxOpenPositions", label: "max open positions", hint: "hard slot count", step: 1 },
   { key: "maxPortfolioExposurePct", label: "max exposure (%)", hint: "total capital allowed to be at risk" },
   { key: "stopLossPct", label: "stop-loss (%)", hint: "hard exit below entry" },

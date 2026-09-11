@@ -5,7 +5,8 @@ import type { RiskConfig } from "@/lib/types";
  * Every field is editable at runtime through the settings panel.
  */
 export const AGGRESSIVE: RiskConfig = {
-  startingCapitalSol: 10,
+  // ~10 SOL of book at boot, split across the active chain treasuries.
+  startingCapitalUsd: 1_800,
   maxPositionPct: 15,
   maxOpenPositions: 6,
   maxPortfolioExposurePct: 70,
@@ -35,7 +36,7 @@ export const CONSERVATIVE: RiskConfig = {
 };
 
 const NUMERIC_BOUNDS: Record<keyof RiskConfig, [number, number]> = {
-  startingCapitalSol: [0.1, 10_000],
+  startingCapitalUsd: [10, 10_000_000],
   maxPositionPct: [0.5, 100],
   maxOpenPositions: [1, 25],
   maxPortfolioExposurePct: [1, 100],

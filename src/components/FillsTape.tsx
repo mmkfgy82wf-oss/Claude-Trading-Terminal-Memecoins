@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { Fill } from "@/lib/types";
-import { arrow, formatClock, formatSol, formatUsdPrice } from "@/lib/util/format";
+import { arrow, formatClock, formatNative, formatUsdPrice } from "@/lib/util/format";
 import { EmptyState, Panel } from "./ui";
 
 /** Execution tape: what actually got filled, at what price, for what reason. */
@@ -16,7 +16,7 @@ export function FillsTape({ fills, className }: { fills: Fill[]; className?: str
           <AnimatePresence initial={false}>
             {fills.map((fill) => {
               const buy = fill.side === "buy";
-              const pnl = fill.realizedPnlSol;
+              const pnl = fill.realizedPnlNative;
               return (
                 <motion.li
                   key={fill.id}
@@ -41,7 +41,7 @@ export function FillsTape({ fills, className }: { fills: Fill[]; className?: str
                   </span>
                   <span className="shrink-0 text-[10px] font-semibold">{fill.symbol}</span>
                   <span className="tabular shrink-0 text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                    {fill.valueSol.toFixed(3)} SOL @ {formatUsdPrice(fill.priceUsd)}
+                    {fill.valueNative.toFixed(4)} {fill.quote} @ {formatUsdPrice(fill.priceUsd)}
                   </span>
                   <span className="tabular shrink-0 text-[9px]" style={{ color: "var(--text-muted)" }}>
                     slip {fill.slippagePct.toFixed(2)}%
@@ -54,7 +54,7 @@ export function FillsTape({ fills, className }: { fills: Fill[]; className?: str
                       className="tabular ml-auto shrink-0 text-[10px] font-bold"
                       style={{ color: pnl >= 0 ? "var(--pos-glow)" : "var(--neg-glow)" }}
                     >
-                      {arrow(pnl)} {formatSol(pnl)} SOL
+                      {arrow(pnl)} {formatNative(pnl, fill.quote)}
                     </span>
                   )}
                 </motion.li>

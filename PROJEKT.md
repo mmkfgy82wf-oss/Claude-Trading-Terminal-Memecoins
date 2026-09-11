@@ -73,10 +73,29 @@ mit der Confidence des Agenten skaliert. SENTINEL hat bewusst **kein Gewicht** �
 ein Veto ist stärker als jede Gewichtung es ausdrücken könnte und kappt den
 Score hart auf ≤ −60.
 
-### 2.3 Handels-Regeln (aggressives Profil, zur Laufzeit änderbar)
+### 2.3 Eine Treasury pro Chain
 
-- Startkapital 10 SOL · max. 15 % pro Position · max. 6 offene Positionen
-- max. 70 % Gesamtexposure · Stop-Loss −25 %
+**Kapital wandert nicht von selbst zwischen Chains.** Auf Solana zahlst du mit
+SOL, auf einer EVM-L2 mit ETH — dein SOL liegt dort schlicht nicht. Das Buch
+hält deshalb **pro Chain eine eigene Kasse im jeweiligen Quote-Asset**:
+
+| Chain | Quote-Asset | Gebührenmodell |
+|---|---|---|
+| Solana | **SOL** | DEX-Fee + Priority-Fee, hoch genug für einen umkämpften Block |
+| Robinhood Chain | **ETH** | L2-Gas, absolut günstig, aber ETH ist pro Einheit ~20× SOL wert |
+
+Ein Ticket auf einem RHC-Paar wird in ETH dimensioniert, aus der ETH-Kasse
+bezahlt und mit L2-Gas belastet — die SOL-Kasse wird nie berührt. Ist die Kasse
+einer Chain leer, entstehen dort keine Tickets, egal wie bullisch der Konsens
+ist. Aggregate (Equity, P/L, Equity-Kurve) laufen in **USD**, weil das die
+einzige Einheit ist, die auf beiden Chains dasselbe bedeutet.
+
+### 2.4 Handels-Regeln (aggressives Profil, zur Laufzeit änderbar)
+
+- Buchgröße $1.800 (≈ 10 SOL beim Start), gleichmäßig auf die Chain-Kassen verteilt
+- max. 15 % pro Position · max. 6 offene Positionen
+- max. 70 % Gesamtexposure, **pro Chain gegen deren eigene Kasse geprüft**
+- Stop-Loss −25 %
 - Take-Profit-Leiter +50 % / +150 % / +400 % (verkauft 40 % / 35 % / Rest)
 - Trailing-Stop −30 %, **scharf erst nach der ersten TP-Stufe** — sonst würde
   normales Memecoin-Rauschen jeden Einstieg sofort ausstoppen
@@ -84,14 +103,14 @@ Score hart auf ≤ −60.
   blockiert** — in einem Rug festzustecken ist schlimmer als ein schlechter Fill
 - Tagesverlustlimit −35 % stoppt neue Einstiege
 
-### 2.4 Slippage- und Kostenmodell
+### 2.5 Slippage- und Kostenmodell
 
 Fills sind nicht der Mittelkurs. Die Slippage wächst quadratisch mit dem
 Verhältnis Order zu Pool (`estimateSlippagePct`), dazu kommen DEX- und
-Priority-Fees. Ein 2-SOL-Ticket in einen 12k-Pool tut weh — und das Terminal
+Gas-Kosten **der jeweiligen Chain**. Ein 2-SOL-Ticket in einen 12k-Pool tut weh — und das Terminal
 soll das spüren, sonst sind die Papierergebnisse wertlos.
 
-### 2.5 Marktdaten
+### 2.6 Marktdaten
 
 - **Live:** DexScreener-Suche für Discovery, gebündelte Pair-Abfragen (30 pro
   Request) für Refreshes. Preishistorie wird über Refreshes hinweg gehalten,
@@ -102,7 +121,7 @@ soll das spüren, sonst sind die Papierergebnisse wertlos.
   Agenten sind nur gegen einen Feed testbar, der diese Regime reproduziert.
 - **Umschaltung:** pro Chain automatisch, sichtbar in der Statusleiste unten.
 
-### 2.6 Live-Wallet-Anbindung (vorbereitet, bewusst inaktiv)
+### 2.7 Live-Wallet-Anbindung (vorbereitet, bewusst inaktiv)
 
 `src/lib/trading/executor.ts` definiert das Interface `TradeExecutor`.
 `PaperExecutor` ist die aktive Implementierung. `LiveSolanaExecutor` ist die
@@ -115,6 +134,10 @@ Der Weg zum Scharfschalten: Keypair aus einem eigenen Signer laden → Jupiter-
 Quote holen → Swap bauen, signieren, senden, bestätigen → bestätigte Transaktion
 auf ein `Fill` mappen. Die Agenten-Pipeline ändert sich dabei nicht.
 
+Wichtig: Es braucht **einen Executor pro Chain**. Ein Solana-Signer kann keinen
+Trade auf einer EVM-L2 abwickeln — genau deshalb ist das Buch oben pro Chain
+getrennt.
+
 ---
 
 ## 3. Die Oberfläche
@@ -125,7 +148,8 @@ scrollt in seinem eigenen Rahmen; die Seite selbst scrollt nie horizontal.
 
 - **Links:** Agenten-Desk (Status, aktuelle Tätigkeit, Auslastungsbalken,
   Entscheidungszähler) + Freigabe-Queue
-- **Mitte:** Paper-Portfolio (Equity-Hero + Equity-Kurve + Kennzahlen),
+- **Mitte:** Paper-Portfolio (Equity-Hero in USD, Equity-Kurve, **eine
+  Treasury-Karte pro Chain mit dem echten nativen Bestand**, Kennzahlen),
   Konsens-Board (aufklappbarer Audit-Trail), offene Positionen mit sichtbarem
   Ausstiegsplan
 - **Rechts:** Signal-Feed (jede Agenten-Entscheidung, farbcodiert nach Agent),
@@ -156,7 +180,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 17, alle grün (`npm test`)
+### Unit-Tests — 21, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -166,6 +190,11 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 - Ausstiege werden nie durch Slippage blockiert
 - Risk-Patches aus der UI werden geklemmt, nicht vertraut
 - Tagesverlust wird gegen den Sitzungs-Anker gemessen
+- **Ein Robinhood-Chain-Trade wird in ETH notiert, aus der ETH-Kasse bezahlt und
+  rührt die SOL-Kasse nicht an**
+- **Jedes Ticket trägt das Quote-Asset seiner eigenen Chain und passt in deren Kasse**
+- **Eine Chain mit leerer Kasse erzeugt keine Tickets, egal wie bullisch sie aussieht**
+- Das Buch weist jede Chain in ihrem eigenen Quote-Asset aus
 - SCOUT rankt tiefen, aktiven Pool über toten
 - SENTINEL vetoed Honeypot-Muster und Sell-Kaskaden, lässt Gesundes durch
 - QUANT bevorzugt konstruktiven Flow und diskontiert bereits gelaufene Bewegungen
@@ -199,6 +228,13 @@ Konsolenfehler. Beides sauber.
    dimensioniert wurde. Die Queue-Tiefe ist jetzt an die freien Slots gebunden.
 3. **Tabellenzeilen sprangen.** Layout-Animationen auf `<tr>` kollabierten
    Zeilenhöhen; ersetzt durch ein reines Fade.
+4. **Jeder Trade wurde in SOL gebucht — auch auf Robinhood Chain.** Der Executor
+   rechnete grundsätzlich über den SOL-Preis um und zog Solana-Priority-Fees ab,
+   sodass ein RHC-Paar als „0.491 SOL" im Buch stand. Auf einer EVM-L2 ist aber
+   ETH das Quote-Asset, und SOL existiert dort nicht. Behoben durch die
+   Treasury-pro-Chain aus Abschnitt 2.3. *Diesen Fehler hat der Nutzer gefunden,
+   nicht ich* — meine Tests prüften Beträge, aber nie deren Währung. Die drei
+   neuen Tests oben schließen die Lücke.
 
 ---
 
@@ -245,8 +281,8 @@ src/lib/agents/{scout,sentinel,quant,narrator,risk,executor}.ts
 src/lib/agents/orchestrator.ts   Tick-Loop, Kommandos, Snapshots, SSE-Verteilung
 src/lib/trading/risk.ts          Risikoprofile + Klemmung von UI-Patches
 src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
-src/lib/trading/wallet.ts        Paper-Wallet, Buchhaltung, Kennzahlen
+src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  17 Unit-Tests
+tests/*.test.ts                  21 Unit-Tests
 ```

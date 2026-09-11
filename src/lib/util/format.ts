@@ -15,8 +15,16 @@ export function formatCompactUsd(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-export function formatSol(value: number, digits = 3): string {
-  return `${value >= 0 ? "" : "-"}${Math.abs(value).toFixed(digits)}`;
+/** A signed amount in a chain's quote asset, e.g. "+0.0421 ETH". */
+export function formatNative(value: number, quote: string, digits = 4): string {
+  return `${value >= 0 ? "+" : "-"}${Math.abs(value).toFixed(digits)} ${quote}`;
+}
+
+/** A signed USD amount. USD is the only unit comparable across chains. */
+export function formatSignedUsd(value: number): string {
+  const abs = Math.abs(value);
+  const body = abs >= 1000 ? abs.toLocaleString("en-US", { maximumFractionDigits: 0 }) : abs.toFixed(2);
+  return `${value >= 0 ? "+" : "-"}$${body}`;
 }
 
 export function formatPct(value: number, digits = 1): string {
