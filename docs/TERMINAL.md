@@ -250,7 +250,26 @@ ausfällt.
 
 ---
 
-## 6. Wenn du nur eine Sache im Blick behältst
+## 6. Vom Handy aus
+
+```bash
+npm run phone
+```
+
+Zeigt die LAN-Adresse und einen QR-Code. Handy und Rechner im selben WLAN, QR
+scannen, fertig. Das Layout ist einspaltig ab Handybreite, alle Bedienelemente
+sind erreichbar.
+
+Was du unterwegs am ehesten sehen willst, steht ganz oben: Equity und
+Änderung in der Kopfzeile, darunter der Agenten-Desk, darunter das
+Warum/Warum-nicht-Panel mit dem Klartext-Satz.
+
+**Sicherheitshinweis:** Der Server unterscheidet keine Nutzer. Wer im selben
+Netz die Adresse kennt, kann den Kill-Switch drücken, Tickets freigeben und das
+Buch zurücksetzen. Im Heimnetz bei Paper-Trading unkritisch — bei allem anderen
+vorher nachdenken.
+
+## 7. Wenn du nur eine Sache im Blick behältst
 
 **Die Statusleiste unten.** Steht dort `simulated`, bedeutet kein einziges
 Ergebnis auf dem Bildschirm irgendetwas über den echten Markt — egal wie gut

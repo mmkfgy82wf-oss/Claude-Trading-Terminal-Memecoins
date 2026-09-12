@@ -232,7 +232,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 44, alle grün (`npm test`)
+### Unit-Tests — 47, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -345,5 +345,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  44 Unit-Tests
+tests/*.test.ts                  47 Unit-Tests
 ```

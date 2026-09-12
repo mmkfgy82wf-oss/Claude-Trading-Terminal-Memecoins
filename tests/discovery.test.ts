@@ -247,3 +247,34 @@ test("a tick that trades reports no blocker", async () => {
   assert.ok(risk.funnel.sized > 0);
   assert.equal(risk.blocker, null, "nothing is blocking when tickets are being sized");
 });
+
+// ── the simulator must stay inside believable numbers ─────────────────────
+
+test("the simulator does not compound to absurdity over a long run", async () => {
+  // A desk left running overnight reached prices around 1e100 and an equity
+  // figure the UI rendered as "$90699400060341696.00B". A simulated market
+  // that leaves the range of real numbers stops testing anything.
+  const { MarketSimulator } = await import("../src/lib/market/simulator");
+  const sim = new MarketSimulator("solana", 20);
+
+  let worstPrice = 0;
+  for (let i = 0; i < 4_000; i++) {
+    for (const t of sim.step()) worstPrice = Math.max(worstPrice, t.priceUsd);
+  }
+
+  assert.ok(Number.isFinite(worstPrice), "prices stay finite");
+  assert.ok(worstPrice < 1_000, `a memecoin at $${worstPrice.toExponential(1)} is not a market`);
+});
+
+test("the simulator keeps replacing retired tokens", async () => {
+  const { MarketSimulator } = await import("../src/lib/market/simulator");
+  const sim = new MarketSimulator("solana", 20);
+
+  const first = new Set(sim.step().map((t) => t.id));
+  for (let i = 0; i < 800; i++) sim.step();
+  const later = sim.step();
+
+  assert.equal(later.length, 20, "the pool stays full");
+  const survivors = later.filter((t) => first.has(t.id)).length;
+  assert.ok(survivors < 20, "tokens retire and are replaced rather than living forever");
+});

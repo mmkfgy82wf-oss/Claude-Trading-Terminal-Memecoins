@@ -42,8 +42,9 @@ Ohne Keys läuft alles vollständig — nur mit weniger Signalquellen.
 npm run dev        # Entwicklungsserver
 npm run build      # Produktions-Build
 npm start          # Produktionsserver
-npm test           # Unit-Tests (44)
+npm test           # Unit-Tests (47)
 npm run typecheck  # TypeScript ohne Emit
+npm run phone         # LAN-URL + QR-Code fürs Handy
 npm run check-sources # prüft alle Datenquellen von deinem Netz aus
 npm run check-chains  # zeigt, welche Chains gerade live indiziert sind
 ```

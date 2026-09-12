@@ -21,6 +21,10 @@ interface SimToken {
   fuse: number;
   rugged: boolean;
   birthTick: number;
+  /** Ticks this token gets before attention moves on and it is retired. */
+  lifespan: number;
+  /** Price at spawn, so a runaway can be capped against its own start. */
+  spawnPrice: number;
 }
 
 const NAMES = [
@@ -80,6 +84,11 @@ function spawn(chain: ChainId, tick: number): SimToken {
     fuse: Math.round(rnd(25, 160)),
     rugged: false,
     birthTick: tick,
+    // Memecoins have finite attention spans. Without a bound, a `runner`
+    // compounds forever: at 20k ticks the pool held prices around 1e100 and the
+    // paper book followed them, which tells you nothing about anything.
+    lifespan: Math.round(rnd(160, 520)),
+    spawnPrice: price,
     token: {
       id: `${chain}:${pairAddress}`,
       chain,
@@ -122,10 +131,22 @@ export class MarketSimulator {
 
     for (const sim of [...this.pool.values()]) {
       this.advance(sim);
-      // Retire tokens that rugged a while ago so fresh launches keep appearing.
-      if (sim.rugged && this.tick - sim.birthTick > 40) this.pool.delete(sim.token.id);
+      if (this.retired(sim)) this.pool.delete(sim.token.id);
     }
     return [...this.pool.values()].map((s) => s.token);
+  }
+
+  /**
+   * Whether a token has finished its run. Three ways to be done: it rugged, its
+   * attention span ran out, or it went so far vertical that continuing to
+   * compound would only produce numbers, not a market.
+   */
+  private retired(sim: SimToken): boolean {
+    if (sim.rugged && this.tick - sim.birthTick > 40) return true;
+    if (this.tick - sim.birthTick > sim.lifespan) return true;
+    if (sim.token.priceUsd > sim.spawnPrice * 1_000) return true;
+    if (sim.token.priceUsd < sim.spawnPrice / 5_000) return true;
+    return false;
   }
 
   private advance(sim: SimToken): void {

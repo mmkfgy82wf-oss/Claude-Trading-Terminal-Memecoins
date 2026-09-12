@@ -298,3 +298,24 @@ test("the halt reports when it would roll over on its own", () => {
   w.rearmDailyLimit();
   assert.ok(w.dailyLimitRollsAt() >= rollsAt, "re-arming pushes the automatic roll out too");
 });
+
+// ── the display must survive numbers it should never see ──────────────────
+
+test("formatting survives pathological values instead of printing nonsense", async () => {
+  const { formatCompactUsd, formatPct, formatUsdPrice } = await import("../src/lib/util/format");
+
+  // The exact string a long-running simulator put on screen.
+  assert.ok(!formatCompactUsd(9.06994e16).includes("B"), "past a trillion, B is meaningless");
+  assert.equal(formatCompactUsd(1_800), "$1.80K");
+  assert.equal(formatCompactUsd(2_500_000), "$2.50M");
+  assert.equal(formatCompactUsd(-1_800), "-$1.80K");
+  assert.equal(formatCompactUsd(Number.NaN), "—");
+
+  assert.ok(!formatPct(5.0388e24).includes("e"), "a percentage must never render in exponent form");
+  assert.equal(formatPct(12.34), "+12.3%");
+  assert.equal(formatPct(-12.34), "-12.3%");
+  assert.equal(formatPct(Number.POSITIVE_INFINITY), "—");
+
+  assert.ok(!formatUsdPrice(8.3e100).includes("NaN"));
+  assert.equal(formatUsdPrice(0), "$0");
+});
