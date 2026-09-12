@@ -109,7 +109,9 @@ einzige Einheit ist, die auf beiden Chains dasselbe bedeutet.
   normales Memecoin-Rauschen jeden Einstieg sofort ausstoppen
 - max. 3 % Slippage bei Einstiegen; **Ausstiege werden nie durch Slippage
   blockiert** — in einem Rug festzustecken ist schlimmer als ein schlechter Fill
-- Tagesverlustlimit −35 % stoppt neue Einstiege
+- Tagesverlustlimit −35 % stoppt neue Einstiege — **aufhebbar durch den
+  Operator** (`RESUME` setzt den Bezugspunkt neu, `RESET BOOK` startet den Lauf
+  neu). Ohne Eingriff fällt die Sperre erst nach 24 h
 
 ### 2.5 Slippage- und Kostenmodell
 
@@ -230,7 +232,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 39, alle grün (`npm test`)
+### Unit-Tests — 44, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -240,6 +242,13 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 - Ausstiege werden nie durch Slippage blockiert
 - Risk-Patches aus der UI werden geklemmt, nicht vertraut
 - Tagesverlust wird gegen den Sitzungs-Anker gemessen
+- **Eine gerissene Sperre löst sich nicht von selbst, nur weil Positionen
+  geschlossen wurden** — genau deshalb braucht es einen Ausweg
+- **Re-Arm hebt die Sperre auf und lässt Buch, Positionen und realisiertes
+  Ergebnis unangetastet** — der Verlust bleibt auf dem Konto, nur der Bezugspunkt
+  wandert
+- **Ein Reset startet den Lauf bei der konfigurierten Buchgröße neu** und ist
+  nicht sofort wieder gesperrt
 - **Ein Robinhood-Chain-Trade wird in ETH notiert, aus der ETH-Kasse bezahlt und
   rührt die SOL-Kasse nicht an**
 - **Jedes Ticket trägt das Quote-Asset seiner eigenen Chain und passt in deren Kasse**
@@ -336,5 +345,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  39 Unit-Tests
+tests/*.test.ts                  44 Unit-Tests
 ```

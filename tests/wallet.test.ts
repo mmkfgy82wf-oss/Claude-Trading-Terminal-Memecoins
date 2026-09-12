@@ -205,3 +205,96 @@ test("the daily drawdown is measured against the session anchor", () => {
   w.applySell({ ...fill, id: "y", side: "sell", valueNative: 1, realizedPnlNative: -3, realizedPnlUsd: -3 * SOL }, false);
   assert.ok(w.dailyDrawdownPct() > 12, "a 3 SOL loss shows up as a drawdown on the book");
 });
+
+// ── the daily loss limit, and getting out of it ───────────────────────────
+
+/** Drive the book into a drawdown past the limit. */
+function breachDailyLimit(w: PaperWallet, fractionLost = 0.5): void {
+  const size = (BOOK_USD * fractionLost) / SOL;
+  const base: Fill = {
+    id: "brk-buy", tokenId: "solana:BREACH", symbol: "BREACH", chain: "solana", side: "buy",
+    quantity: 1000, priceUsd: 0.001, valueNative: size, feeNative: 0.001, quote: "SOL",
+    slippagePct: 0.5, reason: "t", at: Date.now(), txRef: "paper-a", mode: "paper",
+  };
+  w.applyBuy(base, AGGRESSIVE);
+  w.applySell(
+    { ...base, id: "brk-sell", side: "sell", valueNative: 0.0001,
+      realizedPnlNative: -size, realizedPnlUsd: -size * SOL },
+    false,
+  );
+}
+
+test("a breached daily limit does not clear itself just because positions closed", () => {
+  const w = wallet();
+  breachDailyLimit(w);
+  const first = w.dailyDrawdownPct();
+  assert.ok(first > AGGRESSIVE.dailyLossLimitPct, `expected a breach, got ${first}%`);
+
+  // Nothing else happens — no entries are allowed, so equity cannot recover.
+  // Without an operator action this state simply persists, which is exactly
+  // why an explicit way out has to exist.
+  assert.ok(Math.abs(w.dailyDrawdownPct() - first) < 1e-9, "the drawdown is frozen, not decaying");
+});
+
+test("re-arming clears the halt and keeps the book intact", () => {
+  const w = wallet();
+  // Open a position that should survive the re-arm.
+  const entry: Fill = {
+    id: "keep", tokenId: "solana:KEEP", symbol: "KEEP", chain: "solana", side: "buy",
+    quantity: 500, priceUsd: 0.002, valueNative: 1, feeNative: 0.001, quote: "SOL",
+    slippagePct: 0.4, reason: "t", at: Date.now(), txRef: "paper-k", mode: "paper",
+  };
+  w.applyBuy(entry, AGGRESSIVE);
+  breachDailyLimit(w);
+  assert.ok(w.dailyDrawdownPct() > AGGRESSIVE.dailyLossLimitPct);
+
+  const equityBefore = w.snapshot().equityUsd;
+  const realizedBefore = w.snapshot().realizedPnlUsd;
+  w.rearmDailyLimit();
+
+  assert.ok(w.dailyDrawdownPct() < 1e-6, "the limit now measures from here");
+  const after = w.snapshot();
+  assert.ok(Math.abs(after.equityUsd - equityBefore) < 1e-9, "equity is untouched");
+  assert.equal(after.realizedPnlUsd, realizedBefore, "realised P/L is kept — the run continues");
+  assert.ok(w.positionFor("solana:KEEP"), "open positions survive a re-arm");
+});
+
+test("re-arming does not forgive the loss, only the halt", () => {
+  const w = wallet();
+  breachDailyLimit(w);
+  const lost = w.snapshot().realizedPnlUsd;
+  w.rearmDailyLimit();
+  assert.ok(lost < 0);
+  assert.equal(w.snapshot().realizedPnlUsd, lost, "the loss stays on the record");
+  assert.ok(w.snapshot().equityUsd < BOOK_USD, "equity is still down — only the reference moved");
+});
+
+test("resetting the book starts the run over at the configured size", () => {
+  const w = wallet();
+  breachDailyLimit(w);
+  w.applyBuy(
+    { id: "x", tokenId: "solana:X", symbol: "X", chain: "solana", side: "buy", quantity: 10,
+      priceUsd: 0.01, valueNative: 0.5, feeNative: 0.001, quote: "SOL", slippagePct: 0.4,
+      reason: "t", at: Date.now(), txRef: "paper-x", mode: "paper" },
+    AGGRESSIVE,
+  );
+
+  w.resetTo(BOOK_USD);
+  const snap = w.snapshot();
+  assert.equal(snap.openPositions, 0, "positions are cleared");
+  assert.equal(snap.realizedPnlUsd, 0, "history is cleared");
+  assert.ok(Math.abs(snap.equityUsd - BOOK_USD) < 1e-6, "treasuries are refunded");
+  assert.equal(snap.wins + snap.losses, 0);
+  assert.ok(w.dailyDrawdownPct() < 1e-6, "a fresh run is not born halted");
+  assert.equal(w.cashOn("solana"), 10, "the SOL treasury is funded again");
+});
+
+test("the halt reports when it would roll over on its own", () => {
+  const w = wallet();
+  const rollsAt = w.dailyLimitRollsAt();
+  const hours = (rollsAt - Date.now()) / 3_600_000;
+  assert.ok(hours > 23 && hours <= 24, `expected ~24h, got ${hours.toFixed(1)}h`);
+
+  w.rearmDailyLimit();
+  assert.ok(w.dailyLimitRollsAt() >= rollsAt, "re-arming pushes the automatic roll out too");
+});

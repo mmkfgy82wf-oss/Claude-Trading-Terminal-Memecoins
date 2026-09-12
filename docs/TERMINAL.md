@@ -106,6 +106,19 @@ beantwortet.
 
 **FEEDS** — Live/simuliert pro Chain, Anzahl Paare, neue Launches.
 
+**Bei gerissenem Tagesverlustlimit** erscheint hier zusätzlich ein roter Block
+mit dem aktuellen Drawdown, der Angabe, wann die Sperre von selbst fällt, und
+zwei Knöpfen:
+
+| Knopf | Wirkung |
+|---|---|
+| `RESUME` | Setzt den Bezugspunkt des Limits auf die **aktuelle** Equity. Positionen, Historie und realisiertes Ergebnis bleiben — der Lauf geht weiter, der Verlust bleibt auf dem Konto |
+| `RESET BOOK` | Startet den Lauf **neu**: Kassen wieder auf die Buchgröße, keine Positionen, keine Historie |
+
+Ohne Eingriff bleibt die Sperre bis zu 24 Stunden bestehen. Das ist Absicht:
+Ein Limit, das sich selbst aufhebt, ist kein Limit. Aber im Paper-Trading willst
+du beobachten, nicht warten — deshalb die beiden Knöpfe.
+
 ### Paper-Portfolio (Mitte oben)
 
 | Element | Bedeutung |
@@ -218,6 +231,7 @@ ausfällt.
 | Terminal wirkt eingefroren | **Agenten-Desk**, Tick-Zähler | Zähler steht = Desk hängt. Zähler läuft = Anzeige hängt |
 | Position wird nicht verkauft | **Offene Positionen** | SL/TP/Trail-Zustand stehen in der Zeile |
 | Einträge nur „APPROVAL REQUIRED" | Kopfzeile | Du bist in `MANUAL` |
+| Tagesverlustlimit gerissen | **Warum/Warum-nicht** | Zwei Knöpfe dort: `RESUME` misst ab jetzt weiter, `RESET BOOK` startet den Lauf neu |
 
 ---
 
@@ -230,6 +244,8 @@ ausfällt.
 | Position schließen | `CLOSE` in der Positionszeile | Sofort, vollständig |
 | Alles liquidieren | `KILL SWITCH` | Sofort, plus Sperre für neue Einstiege |
 | Risiko ändern | `⚙ RISK` | Ab dem nächsten Tick |
+| Limit-Sperre aufheben | `RESUME` im Warum/Warum-nicht-Panel | Sofort, Buch bleibt |
+| Lauf neu starten | `↺ START A FRESH RUN` im Risk-Panel, oder `RESET BOOK` | Sofort, Buch wird geleert |
 | Details zu einem Token | Zeile im Konsens-Board anklicken | Audit-Trail aller Agenten |
 
 ---

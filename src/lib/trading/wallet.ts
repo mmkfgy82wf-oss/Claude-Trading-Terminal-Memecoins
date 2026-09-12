@@ -12,6 +12,8 @@ import type {
 
 let posSeq = 0;
 
+const DAY_MS = 24 * 60 * 60_000;
+
 /** USD price of each chain's quote asset, refreshed by the orchestrator. */
 export type QuotePrices = Record<ChainId, number>;
 
@@ -203,13 +205,39 @@ export class PaperWallet {
     return sum;
   }
 
-  /** Percentage drawdown since the rolling 24h anchor — feeds the loss limit. */
+  /**
+   * Percentage drawdown since the rolling 24h anchor — feeds the loss limit.
+   *
+   * The anchor rolls on its own after 24h, but that is a long time to stare at
+   * a halted desk: once entries stop, equity can only move through positions
+   * that are already open, so a breached limit tends to stay breached. The
+   * operator can therefore re-arm it deliberately (`rearmDailyLimit`), which is
+   * the honest version of "I have seen it, carry on" — the halt is never lifted
+   * silently.
+   */
   dailyDrawdownPct(): number {
-    if (Date.now() - this.dayAnchorAt > 24 * 60 * 60_000) {
+    if (Date.now() - this.dayAnchorAt > DAY_MS) {
       this.dayAnchorAt = Date.now();
       this.dayAnchorEquityUsd = this.equityUsd();
     }
     return ((this.dayAnchorEquityUsd - this.equityUsd()) / this.dayAnchorEquityUsd) * 100;
+  }
+
+  /** When the anchor rolls by itself, as epoch ms. */
+  dailyLimitRollsAt(): number {
+    return this.dayAnchorAt + DAY_MS;
+  }
+
+  /**
+   * Re-anchor the daily loss limit to right now.
+   *
+   * Positions, cash, fills and the equity curve are untouched — only the
+   * reference point the limit measures against moves. Use this to carry on from
+   * where the desk actually stands rather than wiping the run.
+   */
+  rearmDailyLimit(): void {
+    this.dayAnchorAt = Date.now();
+    this.dayAnchorEquityUsd = this.equityUsd();
   }
 
   treasuries(): ChainTreasury[] {
@@ -264,7 +292,13 @@ export class PaperWallet {
     };
   }
 
-  /** Used when the operator changes the book size from the settings panel. */
+  /**
+   * Start the run over: fresh treasuries, no positions, no history.
+   *
+   * This is a paper-trading affordance and nothing else — it exists so a run
+   * can be repeated under changed parameters, which is how you learn anything
+   * from a simulated book.
+   */
   resetTo(startingEquityUsd: number): void {
     this.startingEquityUsd = startingEquityUsd;
     this.fund(startingEquityUsd, this.prices);

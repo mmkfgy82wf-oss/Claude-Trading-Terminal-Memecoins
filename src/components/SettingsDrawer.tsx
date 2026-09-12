@@ -34,11 +34,13 @@ export function SettingsDrawer({
   risk,
   onClose,
   onApply,
+  onReset,
 }: {
   open: boolean;
   risk: RiskConfig;
   onClose: () => void;
   onApply: (patch: Partial<RiskConfig>) => void;
+  onReset: () => void;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [ladder, setLadder] = useState(risk.takeProfitLadder.join(", "));
@@ -127,6 +129,26 @@ export function SettingsDrawer({
                   </span>
                 </label>
               </div>
+            </div>
+
+            {/* Changing parameters mid-run muddles the result, so starting a
+                clean run under the new ones is offered right here. */}
+            <div className="shrink-0 border-t px-3 py-2.5" style={{ borderColor: "var(--grid-line)" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  onReset();
+                  onClose();
+                }}
+                className="w-full rounded border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider transition-transform active:scale-[0.99]"
+                style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
+              >
+                ↺ start a fresh run
+              </button>
+              <p className="mt-1 text-[9px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                Refunds the treasuries to the book size above and clears positions, fills and the
+                equity curve. Paper only — there is nothing else it could touch.
+              </p>
             </div>
 
             <footer className="flex shrink-0 gap-2 border-t px-3 py-3" style={{ borderColor: "var(--grid-line)" }}>

@@ -10,7 +10,9 @@ type Command =
   | { type: "approve"; id: string }
   | { type: "reject"; id: string }
   | { type: "close"; positionId: string }
-  | { type: "risk"; patch: Partial<RiskConfig> };
+  | { type: "risk"; patch: Partial<RiskConfig> }
+  | { type: "rearm" }
+  | { type: "reset" };
 
 /** Every operator action funnels through here so the desk stays the one authority. */
 export async function POST(request: Request): Promise<Response> {
@@ -43,6 +45,12 @@ export async function POST(request: Request): Promise<Response> {
       break;
     case "risk":
       desk.updateRisk(command.patch ?? {});
+      break;
+    case "rearm":
+      desk.rearmDailyLimit();
+      break;
+    case "reset":
+      desk.resetBook();
       break;
     default:
       return Response.json({ ok: false, error: "unknown command" }, { status: 400 });

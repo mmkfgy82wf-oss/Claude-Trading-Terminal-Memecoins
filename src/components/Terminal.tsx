@@ -56,6 +56,8 @@ export function Terminal() {
               <DiagnosticsPanel
                 diagnostics={snapshot.diagnostics}
                 chainStatus={snapshot.chainStatus}
+                onRearm={() => void send({ type: "rearm" })}
+                onReset={() => void send({ type: "reset" })}
                 className="xl:flex-[3]"
               />
               <ApprovalQueue
@@ -94,6 +96,7 @@ export function Terminal() {
             risk={snapshot.risk}
             onClose={() => setSettingsOpen(false)}
             onApply={(patch) => void send({ type: "risk", patch })}
+            onReset={() => void send({ type: "reset" })}
           />
         </>
       ) : (

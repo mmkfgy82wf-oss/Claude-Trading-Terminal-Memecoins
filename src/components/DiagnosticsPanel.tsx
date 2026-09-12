@@ -36,10 +36,14 @@ const STAGES: Stage[] = [
 export function DiagnosticsPanel({
   diagnostics,
   chainStatus,
+  onRearm,
+  onReset,
   className,
 }: {
   diagnostics: TickDiagnostics;
   chainStatus: ChainStatus[];
+  onRearm: () => void;
+  onReset: () => void;
   className?: string;
 }) {
   const { funnel, discovery } = diagnostics;
@@ -79,6 +83,57 @@ export function DiagnosticsPanel({
         >
           {diagnostics.blocker}
         </motion.div>
+      )}
+
+      {/* A halt the operator can act on: say when it lifts by itself, and
+          offer both ways out rather than leaving the desk dead for 24 hours. */}
+      {diagnostics.halt && (
+        <div
+          className="border-b px-3 py-2"
+          style={{ borderColor: "var(--grid-line)", background: "rgba(229,72,77,0.06)" }}
+        >
+          <div className="tabular flex items-baseline gap-2 text-[10px]">
+            <span style={{ color: "var(--neg-glow)" }}>
+              −{diagnostics.halt.drawdownPct.toFixed(1)}% of {diagnostics.halt.limitPct}% limit
+            </span>
+            <span style={{ color: "var(--text-muted)" }}>
+              lifts on its own in {hoursUntil(diagnostics.halt.rollsAt)}
+            </span>
+          </div>
+          <div className="mt-1.5 flex gap-1.5">
+            <button
+              type="button"
+              onClick={onRearm}
+              className="flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-transform active:scale-95"
+              style={{
+                background: "rgba(7,164,186,0.16)",
+                color: "var(--series-1-glow)",
+                border: "1px solid rgba(7,164,186,0.4)",
+              }}
+              title="Re-anchor the limit to the current equity. Positions and history are kept."
+            >
+              resume
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-transform active:scale-95"
+              style={{
+                background: "rgba(148,163,184,0.1)",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--grid-line)",
+              }}
+              title="Start the paper run over at the configured book size. Positions and history are wiped."
+            >
+              reset book
+            </button>
+          </div>
+          <div className="mt-1 text-[9px] leading-snug" style={{ color: "var(--text-muted)" }}>
+            <strong style={{ color: "var(--text-secondary)" }}>resume</strong> keeps the run and
+            measures the limit from here.{" "}
+            <strong style={{ color: "var(--text-secondary)" }}>reset book</strong> starts over.
+          </div>
+        </div>
       )}
 
       {/* Where the board came from — answers "why the same tokens again". */}
@@ -185,6 +240,15 @@ export function DiagnosticsPanel({
       </div>
     </Panel>
   );
+}
+
+/** Coarse on purpose — the exact minute does not change the decision. */
+function hoursUntil(at: number): string {
+  const ms = at - Date.now();
+  if (ms <= 0) return "moments";
+  const hours = ms / 3_600_000;
+  if (hours < 1) return `${Math.max(1, Math.round(ms / 60_000))}m`;
+  return `${Math.round(hours)}h`;
 }
 
 function Metric({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {

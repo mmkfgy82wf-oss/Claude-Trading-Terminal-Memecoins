@@ -9,7 +9,9 @@ type Command =
   | { type: "approve"; id: string }
   | { type: "reject"; id: string }
   | { type: "close"; positionId: string }
-  | { type: "risk"; patch: Partial<RiskConfig> };
+  | { type: "risk"; patch: Partial<RiskConfig> }
+  | { type: "rearm" }
+  | { type: "reset" };
 
 export type ConnectionState = "connecting" | "live" | "reconnecting";
 

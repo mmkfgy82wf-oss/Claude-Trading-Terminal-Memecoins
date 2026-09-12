@@ -240,6 +240,33 @@ export class Orchestrator {
     this.emit();
   }
 
+  /**
+   * Re-anchor the daily loss limit without touching the book.
+   *
+   * Deliberately an operator action rather than something the desk does for
+   * itself: a limit that lifts on its own is not a limit. Keeping positions and
+   * history intact is the point — the run continues from where it stands.
+   */
+  rearmDailyLimit(): void {
+    this.wallet.rearmDailyLimit();
+    this.log(
+      "system",
+      "Daily loss limit re-armed by the operator — entries resume from the current equity",
+    );
+    this.emit();
+  }
+
+  /** Start the paper run over at the configured book size. */
+  resetBook(): void {
+    this.wallet.resetTo(this.risk.startingCapitalUsd);
+    this.approvals = [];
+    this.log(
+      "system",
+      `Book reset — $${this.risk.startingCapitalUsd.toLocaleString("en-US")} across ${this.chains.length} chain treasuries, no positions, no history`,
+    );
+    this.emit();
+  }
+
   updateRisk(patch: Partial<RiskConfig>): void {
     const before = this.risk;
     this.risk = sanitizeRisk(this.risk, patch);
@@ -295,6 +322,7 @@ export class Orchestrator {
   }
 
   private diagnostics(watchlist: Token[]): TickDiagnostics {
+    const drawdownPct = this.wallet.dailyDrawdownPct();
     const ages = watchlist.map((t) => t.ageMinutes).sort((a, b) => a - b);
     const median = ages.length ? ages[Math.floor(ages.length / 2)] : 0;
 
@@ -309,6 +337,14 @@ export class Orchestrator {
       discovery: this.feed.provenance(),
       funnel: this.riskAgent.funnel,
       blocker,
+      halt:
+        drawdownPct >= this.risk.dailyLossLimitPct
+          ? {
+              drawdownPct,
+              limitPct: this.risk.dailyLossLimitPct,
+              rollsAt: this.wallet.dailyLimitRollsAt(),
+            }
+          : null,
       medianAgeMinutes: median,
     };
   }

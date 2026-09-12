@@ -314,6 +314,12 @@ export interface TickDiagnostics {
   };
   /** Single-sentence answer to "why is nothing happening?", or null when trading. */
   blocker: string | null;
+  /**
+   * Set only while the daily loss limit is holding the desk. Carries what the
+   * operator needs to decide: how deep the drawdown is, and when it lifts on
+   * its own if they do nothing.
+   */
+  halt: { drawdownPct: number; limitPct: number; rollsAt: number } | null;
   /** Median age of the watchlist, in minutes — a stale board shows up here. */
   medianAgeMinutes: number;
 }
