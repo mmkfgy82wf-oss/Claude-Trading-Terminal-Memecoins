@@ -1,4 +1,5 @@
 import { CHAINS } from "@/lib/market/chains";
+import type { BookState } from "./persistence";
 import type {
   ChainId,
   ChainTreasury,
@@ -290,6 +291,56 @@ export class PaperWallet {
       worstTradeUsd: this.worstTradeUsd,
       equityCurve: [...this.equityCurve],
     };
+  }
+
+  /** Everything needed to rebuild this book after a restart. */
+  serialize(): BookState {
+    return {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      startingEquityUsd: this.startingEquityUsd,
+      cash: Object.fromEntries(this.cash),
+      positions: [...this.positions.values()],
+      // The tape is unbounded over a long run; the recent past is what the UI
+      // shows and what a restart needs to look continuous.
+      fills: this.fills.slice(-200),
+      realizedPnlUsd: this.realizedPnlUsd,
+      wins: this.wins,
+      losses: this.losses,
+      bestTradeUsd: this.bestTradeUsd,
+      worstTradeUsd: this.worstTradeUsd,
+      equityCurve: [...this.equityCurve],
+      dayAnchorEquityUsd: this.dayAnchorEquityUsd,
+      dayAnchorAt: this.dayAnchorAt,
+    };
+  }
+
+  /**
+   * Rebuild from a saved book.
+   *
+   * The daily-limit anchor is restored as it was: a restart must not hand the
+   * desk a clean slate on a limit it had already breached, or restarting would
+   * become the way around the loss limit.
+   */
+  restore(state: BookState): void {
+    this.startingEquityUsd = state.startingEquityUsd;
+    this.cash.clear();
+    for (const [chain, amount] of Object.entries(state.cash)) {
+      this.cash.set(chain as ChainId, Number(amount) || 0);
+    }
+    this.positions.clear();
+    for (const position of state.positions) this.positions.set(position.tokenId, position);
+    this.fills.length = 0;
+    this.fills.push(...state.fills);
+    this.realizedPnlUsd = state.realizedPnlUsd;
+    this.wins = state.wins;
+    this.losses = state.losses;
+    this.bestTradeUsd = state.bestTradeUsd;
+    this.worstTradeUsd = state.worstTradeUsd;
+    this.equityCurve.length = 0;
+    this.equityCurve.push(...state.equityCurve);
+    this.dayAnchorEquityUsd = state.dayAnchorEquityUsd;
+    this.dayAnchorAt = state.dayAnchorAt;
   }
 
   /**

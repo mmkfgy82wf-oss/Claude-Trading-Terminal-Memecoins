@@ -232,7 +232,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 47, alle grün (`npm test`)
+### Unit-Tests — 51, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -302,9 +302,10 @@ Konsolenfehler. Beides sauber.
 - **Chain-Abdeckung wird zur Laufzeit erkannt.** Antwortet eine Chain gerade
   nicht, läuft sie sichtbar simuliert. Mit `npm run check-chains` siehst du
   ohne Umweg, was bei dir live ist und unter welchem Slug.
-- **Der Zustand lebt im Prozess.** Ein Neustart setzt Paper-Wallet und Historie
-  zurück. Für Persistenz wäre ein Snapshot des `PaperWallet` auf Platte der
-  nächste Schritt.
+- ~~Der Zustand lebt im Prozess.~~ **Behoben:** Das Buch wird atomar nach
+  `DATA_DIR` geschrieben und beim Start wiederhergestellt, inklusive des
+  Bezugspunkts für das Tagesverlustlimit — ein Neustart ist kein Weg um das
+  eigene Limit herum.
 - **Ein einzelner Desk-Prozess.** Der Orchestrator ist ein Singleton auf
   `globalThis`; für mehrere Nutzer bräuchte es eine Instanz pro Sitzung.
 - **Der Simulator ist plausibel, nicht kalibriert.** Er reproduziert Regime,
@@ -345,5 +346,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  47 Unit-Tests
+tests/*.test.ts                  51 Unit-Tests
 ```

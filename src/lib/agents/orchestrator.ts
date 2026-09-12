@@ -2,6 +2,7 @@ import { MarketFeed } from "@/lib/market/feed";
 import { fetchQuotePrices, providerFlags } from "@/lib/market/providers";
 import { PaperExecutor } from "@/lib/trading/executor";
 import { AGGRESSIVE, sanitizeRisk } from "@/lib/trading/risk";
+import { loadBook, saveBook } from "@/lib/trading/persistence";
 import { PaperWallet, type QuotePrices } from "@/lib/trading/wallet";
 import type {
   AgentId,
@@ -65,6 +66,8 @@ export class Orchestrator {
   private ticking = false;
   private readonly listeners = new Set<(snap: TerminalSnapshot) => void>();
   private lastSnapshot: TerminalSnapshot | null = null;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private restored = false;
 
   constructor() {
     this.wallet = new PaperWallet(this.risk.startingCapitalUsd, this.chains, this.quotePrices);
@@ -82,6 +85,32 @@ export class Orchestrator {
     if (this.running) return;
     this.running = true;
     this.log("system", "Agent desk online — SCOUT, SENTINEL, QUANT, NARRATOR, RISK, EXECUTOR");
+    void this.boot();
+  }
+
+  /**
+   * Pick the book back up before the first tick.
+   *
+   * A restart must not silently orphan open positions: without this the desk
+   * would show a fresh book while whatever it opened is still out there, with
+   * no stop-loss being evaluated for it.
+   */
+  private async boot(): Promise<void> {
+    const saved = await loadBook();
+    if (saved) {
+      this.wallet.restore(saved);
+      this.restored = true;
+      this.log(
+        "system",
+        `Book restored from disk — ${saved.positions.length} open position(s), saved ${new Date(saved.savedAt).toLocaleString("de-DE")}`,
+      );
+      if (saved.positions.length > 0) {
+        this.log(
+          "warn",
+          "Restored positions are marked against their last known price until the feed catches up",
+        );
+      }
+    }
     void this.loop();
   }
 
@@ -137,6 +166,7 @@ export class Orchestrator {
 
       this.expireApprovals();
       this.emit();
+      this.persist();
     } finally {
       this.ticking = false;
     }
@@ -249,6 +279,7 @@ export class Orchestrator {
    */
   rearmDailyLimit(): void {
     this.wallet.rearmDailyLimit();
+    this.persist();
     this.log(
       "system",
       "Daily loss limit re-armed by the operator — entries resume from the current equity",
@@ -260,6 +291,7 @@ export class Orchestrator {
   resetBook(): void {
     this.wallet.resetTo(this.risk.startingCapitalUsd);
     this.approvals = [];
+    this.persist();
     this.log(
       "system",
       `Book reset — $${this.risk.startingCapitalUsd.toLocaleString("en-US")} across ${this.chains.length} chain treasuries, no positions, no history`,
@@ -353,6 +385,21 @@ export class Orchestrator {
     this.listeners.add(fn);
     fn(this.lastSnapshot ?? this.snapshot());
     return () => this.listeners.delete(fn);
+  }
+
+  /**
+   * Debounced so a burst of fills costs one write, and never awaited inside a
+   * tick — a slow disk must not stall the desk, and a failed write must not
+   * stop it trading.
+   */
+  private persist(): void {
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      void saveBook(this.wallet.serialize()).catch((err) => {
+        this.log("warn", `Could not save the book: ${(err as Error).message}`);
+      });
+    }, 2_000);
   }
 
   private emit(): void {

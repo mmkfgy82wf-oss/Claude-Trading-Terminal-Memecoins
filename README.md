@@ -42,7 +42,7 @@ Ohne Keys läuft alles vollständig — nur mit weniger Signalquellen.
 npm run dev        # Entwicklungsserver
 npm run build      # Produktions-Build
 npm start          # Produktionsserver
-npm test           # Unit-Tests (47)
+npm test           # Unit-Tests (51)
 npm run typecheck  # TypeScript ohne Emit
 npm run phone         # LAN-URL + QR-Code fürs Handy
 npm run check-sources # prüft alle Datenquellen von deinem Netz aus
@@ -77,6 +77,19 @@ nicht, läuft sie sichtbar simuliert statt erfundene Zahlen als live auszugeben.
 | Solana | — | SOL | `api.mainnet-beta.solana.com` |
 | Robinhood Chain | 4663 | ETH | `rpc.mainnet.chain.robinhood.com` |
 
+## Dauerbetrieb
+
+```bash
+docker compose up -d --build
+```
+
+Der Desk ist ein laufender Prozess, kein Request-Handler — **Serverless
+funktioniert nicht** (Vercel, Netlify: die Tick-Schleife überlebt dort nicht).
+Alles, was einen Container am Leben hält, geht: Raspberry Pi, VPS, Fly, Railway.
+
+Der Zustand wird atomar nach `DATA_DIR` geschrieben und beim Start
+wiederhergestellt. Details in [docs/BETRIEB.md](docs/BETRIEB.md).
+
 ## Sicherheit
 
 Das Terminal handelt **ausschließlich mit virtuellem Kapital**. Es gibt keinen
@@ -89,5 +102,6 @@ expliziter Opt-in-Flag gesetzt sind.
 
 | Datei | Inhalt |
 |---|---|
+| **[docs/BETRIEB.md](docs/BETRIEB.md)** | **Dauerbetrieb** — Docker, systemd, Persistenz, Erreichbarkeit |
 | **[docs/TERMINAL.md](docs/TERMINAL.md)** | **Die Oberfläche lesen** — was pro Tick passiert, jedes Panel, jede Zahl, jeder Marker, plus Symptom→Ursache-Tabelle |
 | [PROJEKT.md](PROJEKT.md) | Architektur, Agenten, Entscheidungen, Tests, bekannte Grenzen |

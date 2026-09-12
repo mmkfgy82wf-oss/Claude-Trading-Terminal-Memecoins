@@ -1,0 +1,18 @@
+services:
+  memedesk:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Without this, every restart starts the book from zero.
+      - desk-data:/data
+    env_file:
+      - path: .env.local
+        required: false
+    environment:
+      MARKET_MODE: auto
+      TICK_INTERVAL_MS: "4000"
+    restart: unless-stopped
+
+volumes:
+  desk-data:
