@@ -124,13 +124,28 @@ du beobachten, nicht warten — deshalb die beiden Knöpfe.
 | Element | Bedeutung |
 |---|---|
 | `$1,976 total book` | Gesamtbuch in USD. USD, weil es die einzige Einheit ist, die auf beiden Chains dasselbe bedeutet |
-| Kurve | Equity über die Sitzung. Gestrichelte Linie = Startkapital. Mauszeiger zeigt Zeitpunkt und Wert |
+| Prozentzahl daneben | **Gemessen gegen die Startbestände, nicht gegen eine Dollarzahl.** Siehe unten |
+| Kurve | Performance über die Sitzung, **indexiert auf 100 beim Start**. Gestrichelte Linie = 100. Mauszeiger zeigt Zeitpunkt, Index und Abweichung |
 | **Treasury-Karten** | Eine pro Chain, im **echten Quote-Asset**: `4.2052 SOL free` bzw. `0.1593 ETH free` |
 | `free cash` | Freies Kapital über alle Kassen, in USD |
 | `in positions` | Gebundenes Kapital |
 | `realised` | Aus **geschlossenen** Trades |
 | `unrealised` | Aus **offenen** Positionen — kann sich jederzeit wieder auflösen |
 | `hit rate` | Gewinn/Verlust-Quote. `—` heißt: noch kein Trade vollständig geschlossen |
+
+### Warum die Prozentzahl gegen Bestände misst, nicht gegen Dollar
+
+Das Buch liegt in **SOL und ETH**, nicht in Dollar. Läge der Vergleichswert auf
+einer eingefrorenen Dollarzahl, würde jeder Kursrutsch von SOL als Desk-Verlust
+erscheinen — auch ohne einen einzigen Trade.
+
+Verglichen wird deshalb mit **denselben Beständen zum heutigen Kurs**: Halte 5 SOL
+durch einen SOL-Absturz, und der Desk steht bei 0 %. Der Dollarwert unten fällt
+trotzdem sichtbar — das ist echt und soll sichtbar sein. Nur ist es kein
+Handelsergebnis.
+
+Dasselbe gilt fürs Tagesverlustlimit: Es misst auf demselben Verhältnis, damit
+ein Kursrutsch den Desk nicht für einen Verlust sperrt, den er nicht gemacht hat.
 
 Eine Teilverkaufs-Stufe schließt die Position **nicht** — deshalb kann die
 Execution-Tape schon `SELL` zeigen, während `hit rate` noch `—` steht.
@@ -252,6 +267,7 @@ ausfällt.
 | Immer dieselben Token | **DISCOVERY → `fresh launches`** | 0 bei Live-Daten = keine neuen Launches. `npm run check-sources` |
 | Board altert | **DISCOVERY → `median age`** | Steigt dauerhaft = Discovery liefert nichts Frisches |
 | Alles simuliert | **Statusleiste** | Der Grund steht im Klartext dort |
+| Minus-Prozent ohne Trades | **Portfolio** | Sollte nicht mehr vorkommen — der Vergleich läuft gegen die Startbestände. Tritt es auf, stimmt etwas nicht |
 | Terminal wirkt eingefroren | **Agenten-Desk**, Tick-Zähler | Zähler steht = Desk hängt. Zähler läuft = Anzeige hängt |
 | Position wird nicht verkauft | **Offene Positionen** | SL/TP/Trail-Zustand stehen in der Zeile |
 | Welche Trades liefen gut? | **Trade-Log → `TRADES`** | Ein Eintrag pro Round Trip, mit Ausgang und Grund |

@@ -26,7 +26,10 @@ export interface BookState {
   bestTradeUsd: number;
   worstTradeUsd: number;
   equityCurve: PricePoint[];
-  dayAnchorEquityUsd: number;
+  /** Native amounts the book was funded with — the benchmark. */
+  initialCash?: Record<string, number>;
+  /** Equity over benchmark at the anchor. Optional for books written before it. */
+  dayAnchorRatio?: number;
   dayAnchorAt: number;
 }
 

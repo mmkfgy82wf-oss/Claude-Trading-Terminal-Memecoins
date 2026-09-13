@@ -96,6 +96,21 @@ export class Orchestrator {
    * no stop-loss being evaluated for it.
    */
   private async boot(): Promise<void> {
+    // Quote prices first. The wallet has to be funded at something, and the
+    // constructor only has fallbacks — funding 5 SOL at a guessed $180 and then
+    // revaluing at the real price showed a double-digit loss the desk never
+    // made. Re-funding is refused the moment anything has traded.
+    this.quotePrices = await fetchQuotePrices(this.quotePrices);
+    this.wallet.setPrices(this.quotePrices);
+    if (this.wallet.refundAtPrices(this.quotePrices)) {
+      this.log(
+        "system",
+        `Treasuries funded at live prices — ${this.chains
+          .map((c) => `${c === "solana" ? "SOL" : "ETH"} $${Math.round(this.quotePrices[c])}`)
+          .join(" · ")}`,
+      );
+    }
+
     const saved = await loadBook();
     if (saved) {
       this.wallet.restore(saved);

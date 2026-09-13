@@ -5,9 +5,15 @@ import type { PricePoint } from "@/lib/types";
 import { formatClock } from "@/lib/util/format";
 
 /**
- * Portfolio equity over the session — one series, so it carries no legend; the
- * panel title names it. Interaction is a crosshair plus a value tooltip, which
- * an HTML chart should ship by default.
+ * Performance over the session, indexed to 100 at funding.
+ *
+ * An index rather than a dollar line on purpose: the book is held in SOL and
+ * ETH, so a move in either would drag a dollar curve around and read as though
+ * the desk had gained or lost. Against the funded holdings, a flat desk draws a
+ * flat line whatever the quote assets do.
+ *
+ * One series, so no legend; the panel title names it. Crosshair and tooltip
+ * ship by default, as an HTML chart should.
  */
 export function EquityCurve({
   data,
@@ -46,7 +52,7 @@ export function EquityCurve({
         className="flex items-center justify-center text-[11px]"
         style={{ height, color: "var(--text-muted)" }}
       >
-        equity curve builds after the first ticks
+Performance-Kurve entsteht nach den ersten Ticks
       </div>
     );
   }
@@ -76,7 +82,7 @@ export function EquityCurve({
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         role="img"
-        aria-label="Portfolio equity in SOL over the session"
+        aria-label="Desk performance over the session, indexed to 100 at funding"
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -127,7 +133,12 @@ export function EquityCurve({
           }}
         >
           <span style={{ color: "var(--text-secondary)" }}>{formatClock(hovered.t)}</span>{" "}
-          {hovered.p.toFixed(4)} SOL
+          {hovered.p.toFixed(2)}
+          <span style={{ color: hovered.p >= baseline ? "var(--pos-glow)" : "var(--neg-glow)" }}>
+            {" "}
+            {hovered.p >= baseline ? "+" : ""}
+            {(hovered.p - baseline).toFixed(2)}%
+          </span>
         </div>
       )}
     </div>

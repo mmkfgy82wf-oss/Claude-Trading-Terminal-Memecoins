@@ -319,3 +319,69 @@ test("formatting survives pathological values instead of printing nonsense", asy
   assert.ok(!formatUsdPrice(8.3e100).includes("NaN"));
   assert.equal(formatUsdPrice(0), "$0");
 });
+
+// ── the benchmark must isolate trading from the quote assets' own market ──
+
+test("an untraded book reads 0%, whatever SOL and ETH do", () => {
+  // The bug this exists for: the book was funded at fallback prices, the real
+  // ones arrived seconds later, and the desk reported −32.8% having never
+  // opened a position.
+  const w = new PaperWallet(BOOK_USD, CHAINS_ACTIVE, PRICES);
+  assert.ok(Math.abs(w.snapshot().totalPnlPct) < 1e-9, "a fresh book is flat");
+
+  // SOL almost halves, ETH slides too — a real market move, not a desk result.
+  w.setPrices({ solana: 101, robinhood: 2507 });
+  const snap = w.snapshot();
+  assert.ok(
+    Math.abs(snap.totalPnlPct) < 1e-9,
+    `holding through a price move is not a trading loss, got ${snap.totalPnlPct}%`,
+  );
+  assert.ok(snap.equityUsd < BOOK_USD, "the dollar value of the book really did fall");
+  assert.ok(
+    Math.abs(snap.equityUsd - snap.startingEquityUsd) < 1e-9,
+    "the benchmark falls with it, because it is the same holdings",
+  );
+});
+
+test("a quote-price slide cannot trip the daily loss limit", () => {
+  const w = new PaperWallet(BOOK_USD, CHAINS_ACTIVE, PRICES);
+  w.setPrices({ solana: 60, robinhood: 1500 });
+  assert.ok(
+    w.dailyDrawdownPct() < 1e-9,
+    `a two-thirds fall in SOL must not halt the desk, got ${w.dailyDrawdownPct()}%`,
+  );
+});
+
+test("real trading gains still show through a price move", async () => {
+  const w = new PaperWallet(BOOK_USD, CHAINS_ACTIVE, PRICES);
+  const executor = new PaperExecutor();
+  const entry = (await executor.buy(intent(1), token(), SOL, AGGRESSIVE)).fill as Fill;
+  const position = w.applyBuy(entry, AGGRESSIVE);
+
+  const doubled = token({ priceUsd: 0.002 });
+  w.markToMarket(new Map([[doubled.id, doubled]]));
+  const exit = (await executor.sell(w.positionFor(doubled.id)!, doubled, 1, "tp", SOL, AGGRESSIVE)).fill as Fill;
+  w.applySell(exit, false);
+  void position;
+
+  const before = w.snapshot().totalPnlPct;
+  assert.ok(before > 0, "doubling a position is a gain");
+
+  // Now SOL halves. The gain was made in SOL and is still there in SOL terms.
+  w.setPrices({ solana: SOL / 2, robinhood: ETH });
+  const after = w.snapshot().totalPnlPct;
+  assert.ok(after > 0, `the trading gain must survive the repricing, got ${after}%`);
+});
+
+test("re-funding is refused once the desk has traded", async () => {
+  const w = new PaperWallet(BOOK_USD, CHAINS_ACTIVE, PRICES);
+  assert.equal(w.refundAtPrices({ solana: 101, robinhood: 2507 }), true, "an untouched book may be re-funded");
+
+  const entry = (await new PaperExecutor().buy(intent(1), token(), 101, AGGRESSIVE)).fill as Fill;
+  w.applyBuy(entry, AGGRESSIVE);
+  assert.equal(
+    w.refundAtPrices({ solana: 200, robinhood: 4000 }),
+    false,
+    "re-funding must never be a way to erase a real result",
+  );
+});

@@ -63,7 +63,18 @@ export class PaperWallet {
   private bestTradeUsd = 0;
   private worstTradeUsd = 0;
   private readonly equityCurve: PricePoint[] = [];
-  private dayAnchorEquityUsd: number;
+  /**
+   * What the book was funded with, in native units per chain.
+   *
+   * The benchmark has to be the *holdings*, not a dollar figure frozen at
+   * funding time. Hold 5 SOL through a 40% drop in SOL and your dollar book
+   * halves — real, but nothing the desk did. Measuring against what those same
+   * holdings are worth right now isolates trading from the quote asset's own
+   * market.
+   */
+  private readonly initialCash = new Map<ChainId, number>();
+  /** Equity over benchmark at the anchor — a ratio, so prices cancel out. */
+  private dayAnchorRatio = 1;
   private dayAnchorAt = Date.now();
 
   constructor(
@@ -72,17 +83,51 @@ export class PaperWallet {
     private prices: QuotePrices,
   ) {
     this.fund(startingEquityUsd, prices);
-    this.dayAnchorEquityUsd = startingEquityUsd;
-    this.equityCurve.push({ t: Date.now(), p: startingEquityUsd });
+    this.equityCurve.push({ t: Date.now(), p: 100 });
   }
 
   /** Split the book evenly across the active chains, held natively. */
   private fund(totalUsd: number, prices: QuotePrices): void {
     const perChainUsd = totalUsd / Math.max(1, this.chains.length);
     this.cash.clear();
+    this.initialCash.clear();
     for (const chain of this.chains) {
-      this.cash.set(chain, perChainUsd / Math.max(1e-9, prices[chain]));
+      const native = perChainUsd / Math.max(1e-9, prices[chain]);
+      this.cash.set(chain, native);
+      this.initialCash.set(chain, native);
     }
+    this.dayAnchorRatio = 1;
+    this.dayAnchorAt = Date.now();
+  }
+
+  /**
+   * Re-fund an untraded book at corrected prices.
+   *
+   * Quote prices are fetched after boot, so the first funding necessarily uses
+   * fallbacks. Revaluing those holdings then showed a double-digit loss the desk
+   * never made. Refuses once anything has happened, so it can never be a way to
+   * paper over a real result.
+   */
+  refundAtPrices(prices: QuotePrices): boolean {
+    if (this.positions.size > 0 || this.fills.length > 0 || this.trades.length > 0) return false;
+    this.prices = prices;
+    this.fund(this.startingEquityUsd, prices);
+    this.equityCurve.length = 0;
+    this.equityCurve.push({ t: Date.now(), p: 100 });
+    return true;
+  }
+
+  /** What the originally funded holdings are worth at today's prices. */
+  benchmarkUsd(): number {
+    let sum = 0;
+    for (const [chain, native] of this.initialCash) sum += native * this.quotePrice(chain);
+    return sum;
+  }
+
+  /** Equity over benchmark. 1 is flat, 1.1 is up a tenth — prices cancel. */
+  private performance(): number {
+    const benchmark = this.benchmarkUsd();
+    return benchmark > 0 ? this.equityUsd() / benchmark : 1;
   }
 
   /** Quote-asset prices change; positions and cash keep their native amounts. */
@@ -329,9 +374,11 @@ export class PaperWallet {
   dailyDrawdownPct(): number {
     if (Date.now() - this.dayAnchorAt > DAY_MS) {
       this.dayAnchorAt = Date.now();
-      this.dayAnchorEquityUsd = this.equityUsd();
+      this.dayAnchorRatio = this.performance();
     }
-    return ((this.dayAnchorEquityUsd - this.equityUsd()) / this.dayAnchorEquityUsd) * 100;
+    // Measured on the ratio, so a slide in SOL or ETH cannot halt the desk for
+    // a loss it did not make.
+    return ((this.dayAnchorRatio - this.performance()) / this.dayAnchorRatio) * 100;
   }
 
   /** When the anchor rolls by itself, as epoch ms. */
@@ -348,7 +395,7 @@ export class PaperWallet {
    */
   rearmDailyLimit(): void {
     this.dayAnchorAt = Date.now();
-    this.dayAnchorEquityUsd = this.equityUsd();
+    this.dayAnchorRatio = this.performance();
   }
 
   treasuries(): ChainTreasury[] {
@@ -377,9 +424,13 @@ export class PaperWallet {
     const cashUsd = treasuries.reduce((s, t) => s + t.cashNative * t.quotePriceUsd, 0);
     const unrealizedUsd = [...this.positions.values()].reduce((s, p) => s + p.unrealizedPnlUsd, 0);
 
+    // The curve is an index, 100 at funding: it answers "is the desk ahead?"
+    // without a move in SOL or ETH dragging the whole line with it.
+    const benchmarkUsd = this.benchmarkUsd();
+    const index = benchmarkUsd > 0 ? (equityUsd / benchmarkUsd) * 100 : 100;
     const last = this.equityCurve[this.equityCurve.length - 1];
-    if (!last || Math.abs(last.p - equityUsd) > 1e-9) {
-      this.equityCurve.push({ t: Date.now(), p: equityUsd });
+    if (!last || Math.abs(last.p - index) > 1e-9) {
+      this.equityCurve.push({ t: Date.now(), p: index });
       if (this.equityCurve.length > 240) this.equityCurve.shift();
     }
 
@@ -389,10 +440,10 @@ export class PaperWallet {
       cashUsd,
       positionsValueUsd: equityUsd - cashUsd,
       equityUsd,
-      startingEquityUsd: this.startingEquityUsd,
+      startingEquityUsd: benchmarkUsd,
       realizedPnlUsd: this.realizedPnlUsd,
       unrealizedPnlUsd: unrealizedUsd,
-      totalPnlPct: ((equityUsd - this.startingEquityUsd) / this.startingEquityUsd) * 100,
+      totalPnlPct: benchmarkUsd > 0 ? ((equityUsd - benchmarkUsd) / benchmarkUsd) * 100 : 0,
       openPositions: this.positions.size,
       wins: this.wins,
       losses: this.losses,
@@ -421,7 +472,8 @@ export class PaperWallet {
       bestTradeUsd: this.bestTradeUsd,
       worstTradeUsd: this.worstTradeUsd,
       equityCurve: [...this.equityCurve],
-      dayAnchorEquityUsd: this.dayAnchorEquityUsd,
+      initialCash: Object.fromEntries(this.initialCash),
+      dayAnchorRatio: this.dayAnchorRatio,
       dayAnchorAt: this.dayAnchorAt,
     };
   }
@@ -454,7 +506,21 @@ export class PaperWallet {
     this.worstTradeUsd = state.worstTradeUsd;
     this.equityCurve.length = 0;
     this.equityCurve.push(...state.equityCurve);
-    this.dayAnchorEquityUsd = state.dayAnchorEquityUsd;
+    this.initialCash.clear();
+    if (state.initialCash) {
+      for (const [chain, native] of Object.entries(state.initialCash)) {
+        this.initialCash.set(chain as ChainId, Number(native) || 0);
+      }
+    } else {
+      // A book from before the benchmark was held natively: rebuild it from the
+      // dollar figure at today's prices. The baseline restarts from here rather
+      // than carrying forward a number that was wrong to begin with.
+      const perChainUsd = state.startingEquityUsd / Math.max(1, this.chains.length);
+      for (const chain of this.chains) {
+        this.initialCash.set(chain, perChainUsd / Math.max(1e-9, this.quotePrice(chain)));
+      }
+    }
+    this.dayAnchorRatio = state.dayAnchorRatio ?? 1;
     this.dayAnchorAt = state.dayAnchorAt;
   }
 
@@ -478,8 +544,6 @@ export class PaperWallet {
     this.bestTradeUsd = 0;
     this.worstTradeUsd = 0;
     this.equityCurve.length = 0;
-    this.equityCurve.push({ t: Date.now(), p: startingEquityUsd });
-    this.dayAnchorEquityUsd = startingEquityUsd;
-    this.dayAnchorAt = Date.now();
+    this.equityCurve.push({ t: Date.now(), p: 100 });
   }
 }

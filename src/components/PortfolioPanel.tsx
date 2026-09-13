@@ -55,14 +55,16 @@ export function PortfolioPanel({
               {arrow(portfolio.totalPnlPct)} {formatPct(portfolio.totalPnlPct, 2)}
             </div>
             <div className="tabular text-[10px]" style={{ color: "var(--text-secondary)" }}>
-              {formatSignedUsd(portfolio.equityUsd - portfolio.startingEquityUsd)} vs start
+              {formatSignedUsd(portfolio.equityUsd - portfolio.startingEquityUsd)} gegen die
+              Startbestände
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-2">
-        <EquityCurve data={portfolio.equityCurve} baseline={portfolio.startingEquityUsd} />
+        {/* The curve is indexed to 100 at funding, so that is the reference line. */}
+        <EquityCurve data={portfolio.equityCurve} baseline={100} />
       </div>
 
       {/* Per-chain treasuries. Capital does not cross chains on its own, so the
