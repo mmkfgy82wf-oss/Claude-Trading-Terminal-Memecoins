@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function Panel({
   title,
@@ -115,6 +115,44 @@ export function ScoreBar({ score, color }: { score: number; color: string }) {
       />
     </div>
   );
+}
+
+/** Tweens a number across ticks so the headline doesn't jump. */
+export function CountUp({
+  value,
+  format,
+}: {
+  value: number;
+  format: (n: number) => string;
+}) {
+  const [shown, setShown] = useState(value);
+  const fromRef = useRef(value);
+  useEffect(() => {
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShown(value);
+      fromRef.current = value;
+      return;
+    }
+    const from = fromRef.current;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / 420);
+      const eased = 1 - (1 - p) * (1 - p);
+      const next = from + (value - from) * eased;
+      setShown(next);
+      if (p < 1) raf = requestAnimationFrame(step);
+      else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(shown)}</>;
+}
+
+export function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="kbd">{children}</kbd>;
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {

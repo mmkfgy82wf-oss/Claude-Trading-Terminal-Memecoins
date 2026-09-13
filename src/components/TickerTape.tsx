@@ -7,7 +7,13 @@ import { arrow, formatPct, formatUsdPrice } from "@/lib/util/format";
  * The scrolling tape. Duplicated once so the marquee loops seamlessly at -50%;
  * it pauses on hover so a symbol can actually be read.
  */
-export function TickerTape({ tokens }: { tokens: Token[] }) {
+export function TickerTape({
+  tokens,
+  onInspect,
+}: {
+  tokens: Token[];
+  onInspect?: (tokenId: string) => void;
+}) {
   if (tokens.length === 0) return null;
   const row = [...tokens, ...tokens];
 
@@ -20,7 +26,12 @@ export function TickerTape({ tokens }: { tokens: Token[] }) {
         {row.map((token, i) => {
           const up = token.change1h >= 0;
           return (
-            <span key={`${token.id}-${i}`} className="tabular mx-4 inline-flex shrink-0 items-baseline gap-1.5 text-[11px]">
+            <button
+              key={`${token.id}-${i}`}
+              type="button"
+              className="tape-item tabular mx-4 inline-flex shrink-0 items-baseline gap-1.5 text-[11px]"
+              onClick={() => onInspect?.(token.id)}
+            >
               <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
                 {token.symbol}
               </span>
@@ -32,7 +43,7 @@ export function TickerTape({ tokens }: { tokens: Token[] }) {
                 {arrow(token.change1h)} {formatPct(token.change1h)}
               </span>
               <span style={{ color: "var(--surface-3)" }}>│</span>
-            </span>
+            </button>
           );
         })}
       </div>

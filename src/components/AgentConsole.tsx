@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { AgentRuntimeState } from "@/lib/types";
+import type { AgentId, AgentRuntimeState } from "@/lib/types";
 import { relativeTime } from "@/lib/util/format";
 import { Panel } from "./ui";
 
@@ -30,10 +30,14 @@ function statusColor(status: AgentRuntimeState["status"], agentColor: string): s
 export function AgentConsole({
   agents,
   tick,
+  selectedId,
+  onSelect,
   className,
 }: {
   agents: AgentRuntimeState[];
   tick: number;
+  selectedId?: AgentId | null;
+  onSelect?: (id: AgentId) => void;
   className?: string;
 }) {
   return (
@@ -59,11 +63,14 @@ export function AgentConsole({
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.06 }}
-              className={`border-b px-3 py-2 last:border-b-0 ${active ? "agent-live" : ""}`}
+              className={`cursor-pointer border-b px-3 py-2 last:border-b-0 ${active ? "agent-live" : ""}`}
               style={{
                 borderColor: "var(--grid-line)",
                 ["--agent" as string]: agent.color,
+                background: selectedId === agent.id ? `color-mix(in srgb, ${agent.color} 14%, transparent)` : undefined,
               }}
+              onClick={() => onSelect?.(agent.id)}
+              title="Filter the signal feed to this agent"
             >
               <div className="flex items-center gap-2">
                 <span

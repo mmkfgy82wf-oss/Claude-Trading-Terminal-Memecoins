@@ -442,6 +442,95 @@ body {
 }
 .tick-pop { animation: tick-pop 280ms ease-out; }
 
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--grid-line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-family: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+
+.tape-item {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 2px;
+  transition: background 140ms ease, transform 140ms ease;
+}
+.tape-item:hover {
+  background: rgba(34, 211, 238, 0.1);
+  transform: translateY(-1px);
+}
+
+.row-hot td:first-child {
+  box-shadow: inset 2px 0 0 var(--pos);
+}
+
+.burst {
+  position: relative;
+  height: 0;
+  pointer-events: none;
+}
+.burst i {
+  position: absolute;
+  left: 36px;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tone, var(--pos-glow));
+  animation: burst-fly 780ms ease-out forwards;
+  animation-delay: calc(var(--i) * 18ms);
+}
+@keyframes burst-fly {
+  0% { transform: rotate(calc(var(--i) * 22deg)) translateX(0) scale(1); opacity: 1; }
+  100% { transform: rotate(calc(var(--i) * 22deg)) translateX(68px) scale(0.15); opacity: 0; }
+}
+
+.spotlight-bar {
+  transition: filter 160ms ease;
+}
+.spotlight-bar:hover { filter: brightness(1.15); }
+
+.filter-chip {
+  border: 1px solid var(--grid-line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+.filter-chip[data-on="true"] {
+  color: var(--series-1-glow);
+  border-color: color-mix(in srgb, var(--series-1) 50%, var(--grid-line));
+  background: rgba(7, 164, 186, 0.12);
+}
+
+.board-search {
+  background: var(--surface-2);
+  border: 1px solid var(--grid-line);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--text-primary);
+  outline: none;
+  width: 110px;
+}
+.board-search:focus {
+  border-color: color-mix(in srgb, var(--series-1) 55%, var(--grid-line));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
   .pulse-dot,
@@ -457,7 +546,8 @@ body {
   .logo-tip,
   .thinking-dots span,
   .radar-ring,
-  .tick-pop {
+  .tick-pop,
+  .burst i {
     animation: none !important;
   }
   .fx-grain,
