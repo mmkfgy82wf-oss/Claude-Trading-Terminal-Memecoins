@@ -3,6 +3,7 @@ import type { BookState } from "./persistence";
 import type {
   ChainId,
   ChainTreasury,
+  ClosedTrade,
   Fill,
   PortfolioSnapshot,
   Position,
@@ -12,6 +13,26 @@ import type {
 } from "@/lib/types";
 
 let posSeq = 0;
+let tradeSeq = 0;
+
+/** A round trip while it is still open, accumulating legs as they fill. */
+interface OpenTrade {
+  id: string;
+  tokenId: string;
+  symbol: string;
+  chain: ChainId;
+  quote: string;
+  openedAt: number;
+  quantity: number;
+  costNative: number;
+  proceedsNative: number;
+  feesNative: number;
+  entryValueUsd: number;
+  exitValueUsd: number;
+  exitQuantity: number;
+  exits: number;
+  rungsTaken: number;
+}
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -32,6 +53,9 @@ export type QuotePrices = Record<ChainId, number>;
 export class PaperWallet {
   private readonly cash = new Map<ChainId, number>();
   private readonly positions = new Map<string, Position>();
+  /** Legs accumulate here until the position closes and the trade is booked. */
+  private readonly openTrades = new Map<string, OpenTrade>();
+  private readonly trades: ClosedTrade[] = [];
   private readonly fills: Fill[] = [];
   private realizedPnlUsd = 0;
   private wins = 0;
@@ -95,6 +119,7 @@ export class PaperWallet {
   applyBuy(fill: Fill, risk: RiskConfig): Position {
     this.cash.set(fill.chain, this.cashOn(fill.chain) - fill.valueNative);
     this.fills.push(fill);
+    this.recordEntry(fill);
 
     const existing = this.positions.get(fill.tokenId);
     if (existing) {
@@ -143,18 +168,18 @@ export class PaperWallet {
     this.cash.set(fill.chain, this.cashOn(fill.chain) + fill.valueNative - fill.feeNative);
     this.fills.push(fill);
 
-    const pnlUsd = fill.realizedPnlUsd ?? 0;
-    this.realizedPnlUsd += pnlUsd;
-    this.bestTradeUsd = Math.max(this.bestTradeUsd, pnlUsd);
-    this.worstTradeUsd = Math.min(this.worstTradeUsd, pnlUsd);
+    this.realizedPnlUsd += fill.realizedPnlUsd ?? 0;
+    this.recordExit(fill);
 
     if (!position) return;
     const remaining = position.quantity - fill.quantity;
     const closed = remaining <= position.quantity * 0.005;
 
     if (closed) {
-      if (pnlUsd >= 0) this.wins += 1;
-      else this.losses += 1;
+      // Judge the round trip, not this leg. A position that took a rung at
+      // +50% and stopped out of the rest can still be a winner overall, and
+      // scoring the last fill alone would file it as a loss.
+      this.bookTrade(fill.tokenId, fill.reason);
       this.positions.delete(fill.tokenId);
       return;
     }
@@ -164,6 +189,91 @@ export class PaperWallet {
       costNative: position.costNative * (remaining / position.quantity),
       filledRungs: rungTaken ? position.filledRungs + 1 : position.filledRungs,
     });
+  }
+
+  private recordEntry(fill: Fill): void {
+    const existing = this.openTrades.get(fill.tokenId);
+    const usd = fill.quantity * fill.priceUsd;
+    if (existing) {
+      existing.quantity += fill.quantity;
+      existing.costNative += fill.valueNative;
+      existing.entryValueUsd += usd;
+      return;
+    }
+    this.openTrades.set(fill.tokenId, {
+      id: `t${Date.now().toString(36)}${(++tradeSeq).toString(36)}`,
+      tokenId: fill.tokenId,
+      symbol: fill.symbol,
+      chain: fill.chain,
+      quote: fill.quote,
+      openedAt: fill.at,
+      quantity: fill.quantity,
+      costNative: fill.valueNative,
+      proceedsNative: 0,
+      feesNative: fill.feeNative,
+      entryValueUsd: usd,
+      exitValueUsd: 0,
+      exitQuantity: 0,
+      exits: 0,
+      rungsTaken: 0,
+    });
+  }
+
+  private recordExit(fill: Fill): void {
+    const trade = this.openTrades.get(fill.tokenId);
+    if (!trade) return;
+    trade.proceedsNative += fill.valueNative - fill.feeNative;
+    trade.feesNative += fill.feeNative;
+    trade.exitValueUsd += fill.quantity * fill.priceUsd;
+    trade.exitQuantity += fill.quantity;
+    trade.exits += 1;
+    if (fill.reason.startsWith("take-profit")) trade.rungsTaken += 1;
+  }
+
+  /** Close the round trip and file it in the log. */
+  private bookTrade(tokenId: string, exitReason: string): void {
+    const trade = this.openTrades.get(tokenId);
+    this.openTrades.delete(tokenId);
+    if (!trade) return;
+
+    const pnlNative = trade.proceedsNative - trade.costNative;
+    const pnlUsd = pnlNative * this.quotePrice(trade.chain);
+    const closedAt = Date.now();
+
+    if (pnlNative >= 0) this.wins += 1;
+    else this.losses += 1;
+    this.bestTradeUsd = Math.max(this.bestTradeUsd, pnlUsd);
+    this.worstTradeUsd = Math.min(this.worstTradeUsd, pnlUsd);
+
+    this.trades.push({
+      id: trade.id,
+      tokenId: trade.tokenId,
+      symbol: trade.symbol,
+      chain: trade.chain,
+      quote: trade.quote,
+      openedAt: trade.openedAt,
+      closedAt,
+      holdMs: closedAt - trade.openedAt,
+      entryPriceUsd: trade.quantity > 0 ? trade.entryValueUsd / trade.quantity : 0,
+      exitPriceUsd: trade.exitQuantity > 0 ? trade.exitValueUsd / trade.exitQuantity : 0,
+      quantity: trade.quantity,
+      costNative: trade.costNative,
+      proceedsNative: trade.proceedsNative,
+      feesNative: trade.feesNative,
+      pnlNative,
+      pnlUsd,
+      pnlPct: trade.costNative > 0 ? (pnlNative / trade.costNative) * 100 : 0,
+      exits: trade.exits,
+      rungsTaken: trade.rungsTaken,
+      exitReason,
+      outcome: pnlNative >= 0 ? "win" : "loss",
+    });
+    if (this.trades.length > 300) this.trades.shift();
+  }
+
+  /** The trade log, newest first. */
+  closedTrades(limit = 60): ClosedTrade[] {
+    return this.trades.slice(-limit).reverse();
   }
 
   /** Re-price open positions against the latest market snapshot. */
@@ -304,6 +414,7 @@ export class PaperWallet {
       // The tape is unbounded over a long run; the recent past is what the UI
       // shows and what a restart needs to look continuous.
       fills: this.fills.slice(-200),
+      trades: this.trades.slice(-300),
       realizedPnlUsd: this.realizedPnlUsd,
       wins: this.wins,
       losses: this.losses,
@@ -332,6 +443,10 @@ export class PaperWallet {
     for (const position of state.positions) this.positions.set(position.tokenId, position);
     this.fills.length = 0;
     this.fills.push(...state.fills);
+    this.trades.length = 0;
+    // Books written before the trade log existed simply have none.
+    if (Array.isArray(state.trades)) this.trades.push(...state.trades);
+    this.openTrades.clear();
     this.realizedPnlUsd = state.realizedPnlUsd;
     this.wins = state.wins;
     this.losses = state.losses;
@@ -354,6 +469,8 @@ export class PaperWallet {
     this.startingEquityUsd = startingEquityUsd;
     this.fund(startingEquityUsd, this.prices);
     this.positions.clear();
+    this.openTrades.clear();
+    this.trades.length = 0;
     this.fills.length = 0;
     this.realizedPnlUsd = 0;
     this.wins = 0;

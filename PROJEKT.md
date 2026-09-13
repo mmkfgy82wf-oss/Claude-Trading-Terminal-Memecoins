@@ -183,6 +183,9 @@ scrollt in seinem eigenen Rahmen; die Seite selbst scrollt nie horizontal.
 
 - **Links:** Agenten-Desk (Status, aktuelle Tätigkeit, Auslastungsbalken,
   Entscheidungszähler), **Warum/Warum-nicht-Panel** und Freigabe-Queue
+- **Rechts unten:** Trade-Log mit zwei Ansichten — abgeschlossene Round Trips
+  (Ausgang, Rendite, Haltedauer, Ausstiegsgrund, Gewinnfaktor) und darunter
+  umschaltbar die einzelnen Fills
 - **Mitte:** Paper-Portfolio (Equity-Hero in USD, Equity-Kurve, **eine
   Treasury-Karte pro Chain mit dem echten nativen Bestand**, Kennzahlen),
   Konsens-Board (aufklappbarer Audit-Trail), offene Positionen mit sichtbarem
@@ -232,7 +235,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 51, alle grün (`npm test`)
+### Unit-Tests — 58, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -346,5 +349,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  51 Unit-Tests
+tests/*.test.ts                  58 Unit-Tests
 ```

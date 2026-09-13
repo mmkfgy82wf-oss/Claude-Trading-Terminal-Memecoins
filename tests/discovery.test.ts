@@ -274,7 +274,7 @@ test("the simulator keeps replacing retired tokens", async () => {
   for (let i = 0; i < 800; i++) sim.step();
   const later = sim.step();
 
-  assert.equal(later.length, 20, "the pool stays full");
+  assert.equal(later.length, 20, "every tick hands the agents a full universe, never a short one");
   const survivors = later.filter((t) => first.has(t.id)).length;
   assert.ok(survivors < 20, "tokens retire and are replaced rather than living forever");
 });

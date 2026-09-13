@@ -129,6 +129,44 @@ export interface TradeIntent {
   positionId?: string;
 }
 
+/**
+ * One completed round trip: everything from the first buy to the fill that
+ * closed the position.
+ *
+ * This is the unit a trader actually judges — a `Fill` is a leg, and a position
+ * exited across a take-profit ladder produces several of them. Asking "did that
+ * one win?" of a single leg gives the wrong answer whenever the ladder ran.
+ */
+export interface ClosedTrade {
+  id: string;
+  tokenId: string;
+  symbol: string;
+  chain: ChainId;
+  /** The chain's quote asset — what the P/L below is denominated in. */
+  quote: string;
+  openedAt: number;
+  closedAt: number;
+  holdMs: number;
+  /** Quantity-weighted averages across every leg. */
+  entryPriceUsd: number;
+  exitPriceUsd: number;
+  quantity: number;
+  costNative: number;
+  /** Received across all exits, net of fees. */
+  proceedsNative: number;
+  feesNative: number;
+  pnlNative: number;
+  pnlUsd: number;
+  /** Return on cost, in percent. */
+  pnlPct: number;
+  /** How many separate exits it took — more than one means the ladder ran. */
+  exits: number;
+  rungsTaken: number;
+  /** Why the final leg fired: stop-loss, a ladder rung, a veto, the kill switch. */
+  exitReason: string;
+  outcome: "win" | "loss";
+}
+
 export type ApprovalState = "pending" | "approved" | "rejected" | "expired";
 
 export interface PendingApproval extends TradeIntent {
@@ -275,6 +313,7 @@ export interface TerminalSnapshot {
   consensus: ConsensusView[];
   positions: Position[];
   fills: Fill[];
+  closedTrades: ClosedTrade[];
   approvals: PendingApproval[];
   portfolio: PortfolioSnapshot;
   logs: LogEntry[];

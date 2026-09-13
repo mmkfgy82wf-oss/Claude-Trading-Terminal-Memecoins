@@ -124,15 +124,20 @@ export class MarketSimulator {
   /** Advance the world one step and return the current universe. */
   step(): Token[] {
     this.tick += 1;
-    while (this.pool.size < this.size) {
-      const s = spawn(this.chain, this.tick);
-      this.pool.set(s.token.id, s);
-    }
 
+    // Retire first, then refill: filling beforehand meant a tick that retired
+    // three tokens returned three short, so the universe flickered in size
+    // between ticks for no reason anyone could act on.
     for (const sim of [...this.pool.values()]) {
       this.advance(sim);
       if (this.retired(sim)) this.pool.delete(sim.token.id);
     }
+
+    while (this.pool.size < this.size) {
+      const fresh = spawn(this.chain, this.tick);
+      this.pool.set(fresh.token.id, fresh);
+    }
+
     return [...this.pool.values()].map((s) => s.token);
   }
 

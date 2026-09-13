@@ -345,6 +345,7 @@ export class Orchestrator {
       consensus: this.board.consensus(),
       positions: this.wallet.openPositions(),
       fills: this.wallet.recentFills(40),
+      closedTrades: this.wallet.closedTrades(60),
       approvals: this.approvals.slice(0, 12),
       portfolio: this.wallet.snapshot(),
       logs: this.logs.slice(-120).reverse(),

@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChainId, Fill, PricePoint, Position } from "@/lib/types";
+import type { ChainId, ClosedTrade, Fill, PricePoint, Position } from "@/lib/types";
 
 /**
  * Keeping the book across restarts.
@@ -18,6 +18,8 @@ export interface BookState {
   cash: Record<string, number>;
   positions: Position[];
   fills: Fill[];
+  /** Optional so a book written before the trade log still loads. */
+  trades?: ClosedTrade[];
   realizedPnlUsd: number;
   wins: number;
   losses: number;

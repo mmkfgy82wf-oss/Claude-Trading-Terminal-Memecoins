@@ -177,14 +177,38 @@ Jede Agenten-Entscheidung, neueste zuerst, eingefärbt nach Agent.
 
 `◈` Signal · `▶` Trade · `▲` Warnung · `✖` Fehler · `▪` System
 
-### Execution-Tape (rechts unten)
+### Trade-Log (rechts unten)
 
-Nur tatsächliche Fills: Seite, Symbol, Chain, Menge im Quote-Asset, Preis,
-**tatsächliche Slippage**, bei Verkäufen das realisierte Ergebnis. Neue Zeilen
-blitzen kurz auf.
+Zwei Ansichten derselben Historie, umschaltbar oben rechts im Panel.
 
-Die Slippage hier ist die interessanteste Zahl des Terminals: Sie zeigt, was
-die Ausführung wirklich gekostet hat.
+**`TRADES`** — eine Zeile pro **abgeschlossenem Round Trip**. Das ist die
+Einheit, die du tatsächlich beurteilst: Eine Position, die über die
+Take-Profit-Leiter ausgestiegen ist, besteht aus mehreren Verkäufen, und der
+letzte davon sagt nichts darüber, ob der Trade gewonnen hat.
+
+Kopfzeile:
+
+| Feld | Bedeutung |
+|---|---|
+| `GEWONNEN / VERLOREN` | Anzahl abgeschlossener Trades je Ausgang |
+| `TREFFERQUOTE` | Anteil Gewinner |
+| `GEWINNFAKTOR` | Bruttogewinn ÷ Bruttoverlust. **Unter 1 verliert der Desk Geld — auch bei hoher Trefferquote** |
+
+Der Gewinnfaktor steht bewusst daneben: Bei Memecoins kann ein Desk zwei von
+drei Trades gewinnen und trotzdem verlieren, wenn der eine Verlierer größer ist
+als beide Gewinner zusammen.
+
+Pro Zeile: `WIN`/`LOSS`, Symbol, Chain, Rendite in Prozent, ein Balken für die
+Größe des Ergebnisses relativ zum größten Trade im Log, das Ergebnis im
+Quote-Asset, Einstiegs- → Ausstiegspreis, Haltedauer, gezogene TP-Stufen und der
+Grund des letzten Ausstiegs.
+
+**`FILLS`** — jede einzelne Ausführung: Seite, Symbol, Menge, Preis,
+**tatsächliche Slippage**, bei Verkäufen das Teilergebnis. Das brauchst du,
+wenn ein Trade seltsam aussieht und du sehen willst, wie er zustande kam.
+
+Die Slippage dort ist die interessanteste Zahl des Terminals: Sie zeigt, was die
+Ausführung wirklich gekostet hat.
 
 ### Freigabe-Queue (links unten)
 
@@ -230,6 +254,8 @@ ausfällt.
 | Alles simuliert | **Statusleiste** | Der Grund steht im Klartext dort |
 | Terminal wirkt eingefroren | **Agenten-Desk**, Tick-Zähler | Zähler steht = Desk hängt. Zähler läuft = Anzeige hängt |
 | Position wird nicht verkauft | **Offene Positionen** | SL/TP/Trail-Zustand stehen in der Zeile |
+| Welche Trades liefen gut? | **Trade-Log → `TRADES`** | Ein Eintrag pro Round Trip, mit Ausgang und Grund |
+| Trade sieht falsch aus | **Trade-Log → `FILLS`** | Zeigt, aus welchen Teilverkäufen er bestand |
 | Einträge nur „APPROVAL REQUIRED" | Kopfzeile | Du bist in `MANUAL` |
 | Tagesverlustlimit gerissen | **Warum/Warum-nicht** | Zwei Knöpfe dort: `RESUME` misst ab jetzt weiter, `RESET BOOK` startet den Lauf neu |
 

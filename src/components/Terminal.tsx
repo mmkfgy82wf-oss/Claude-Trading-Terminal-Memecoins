@@ -8,7 +8,7 @@ import { ApprovalQueue } from "./ApprovalQueue";
 import { BootSequence } from "./BootSequence";
 import { ChainStatusBar } from "./ChainStatusBar";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
-import { FillsTape } from "./FillsTape";
+import { TradeLog } from "./TradeLog";
 import { PortfolioPanel } from "./PortfolioPanel";
 import { PositionsPanel } from "./PositionsPanel";
 import { SettingsDrawer } from "./SettingsDrawer";
@@ -85,7 +85,11 @@ export function Terminal() {
 
             <div className="flex min-h-0 min-w-0 flex-col gap-2">
               <SignalFeed logs={snapshot.logs} className="xl:flex-[3]" />
-              <FillsTape fills={snapshot.fills} className="xl:flex-[2]" />
+              <TradeLog
+                trades={snapshot.closedTrades}
+                fills={snapshot.fills}
+                className="xl:flex-[2]"
+              />
             </div>
           </motion.main>
 
