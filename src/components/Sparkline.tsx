@@ -66,7 +66,7 @@ export function Sparkline({
       <path d={area} fill={`url(#${gradientId})`} />
       <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {/* 2px surface ring keeps the marker readable where it overlaps the line */}
-      <circle cx={lastX} cy={lastY} r={3} fill={stroke} stroke="var(--surface-1)" strokeWidth={2} />
+      <circle className="spark-tip" cx={lastX} cy={lastY} r={3} fill={stroke} stroke="var(--surface-1)" strokeWidth={2} />
     </svg>
   );
 }

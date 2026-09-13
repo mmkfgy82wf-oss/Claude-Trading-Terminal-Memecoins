@@ -93,7 +93,7 @@ export function WatchlistPanel({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.2 }}
-                  className="cursor-pointer border-b transition-colors hover:bg-[rgba(255,255,255,0.03)]"
+                  className="cursor-pointer border-b transition-colors hover:bg-[rgba(34,211,238,0.045)]"
                   style={{ borderColor: "var(--grid-line)" }}
                   onClick={() => setExpanded(open ? null : view.tokenId)}
                 >

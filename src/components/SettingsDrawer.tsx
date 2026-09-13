@@ -80,7 +80,11 @@ export function SettingsDrawer({
           />
           <motion.aside
             className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col border-l"
-            style={{ background: "var(--surface-1)", borderColor: "var(--grid-line)" }}
+            style={{
+              background: "var(--surface-1)",
+              borderColor: "var(--grid-line)",
+              boxShadow: "-18px 0 60px rgba(7,164,186,0.12), -1px 0 0 rgba(34,211,238,0.35)",
+            }}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}

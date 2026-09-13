@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { TerminalSnapshot } from "@/lib/types";
 import { arrow, formatCompactUsd, formatPct } from "@/lib/util/format";
 import type { ConnectionState } from "@/lib/useTerminal";
+import { LogoMark } from "./LogoMark";
 import { Pill } from "./ui";
 
 export function TopBar({
@@ -34,11 +35,17 @@ export function TopBar({
   return (
     <header
       className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-3 py-2"
-      style={{ borderColor: "var(--grid-line)", background: "rgba(14,16,23,0.82)", backdropFilter: "blur(10px)" }}
+      style={{
+        borderColor: "var(--grid-line)",
+        background: "rgba(14,16,23,0.78)",
+        backdropFilter: "blur(14px)",
+        boxShadow: "0 1px 0 color-mix(in srgb, var(--series-1) 28%, transparent)",
+      }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
+        <LogoMark size={20} />
         <motion.span
-          className="text-[15px] font-bold tracking-[0.2em]"
+          className="glitch-title text-[15px] font-bold tracking-[0.2em]"
           style={{ color: "var(--series-1-glow)", textShadow: "0 0 18px rgba(34,211,238,0.5)" }}
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -77,7 +84,7 @@ export function TopBar({
           </span>
           <span className="text-[14px] font-semibold">{formatCompactUsd(portfolio.equityUsd)}</span>
           <span
-            className="text-[11px] font-semibold"
+            className={`text-[11px] font-semibold ${pnlPositive ? "glow-pos" : "glow-neg"}`}
             style={{ color: pnlPositive ? "var(--pos-glow)" : "var(--neg-glow)" }}
           >
             {arrow(portfolio.totalPnlPct)} {formatPct(portfolio.totalPnlPct)}
@@ -112,7 +119,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider transition-colors hover:brightness-125"
+          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
           style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
         >
           ⚙ risk
@@ -122,7 +129,8 @@ export function TopBar({
           type="button"
           onClick={() => onKill(!flags.killSwitch)}
           whileTap={{ scale: 0.95 }}
-          className="rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em]"
+          whileHover={{ scale: 1.03 }}
+          className="desk-btn rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em]"
           style={{
             background: flags.killSwitch ? "var(--neg)" : "rgba(229,72,77,0.12)",
             color: flags.killSwitch ? "#fff" : "var(--neg-glow)",
@@ -134,7 +142,9 @@ export function TopBar({
         </motion.button>
 
         <span className="tabular hidden text-[11px] md:inline" style={{ color: "var(--text-secondary)" }}>
-          {clock}
+          {clock.slice(0, -3)}
+          <span className="blink">:</span>
+          {clock.slice(-2)}
         </span>
       </div>
     </header>

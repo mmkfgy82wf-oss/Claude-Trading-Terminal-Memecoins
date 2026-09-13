@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { useTerminal } from "@/lib/useTerminal";
 import { AgentConsole } from "./AgentConsole";
 import { ApprovalQueue } from "./ApprovalQueue";
+import { Atmosphere } from "./Atmosphere";
 import { BootSequence } from "./BootSequence";
 import { ChainStatusBar } from "./ChainStatusBar";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
@@ -31,11 +32,12 @@ export function Terminal() {
   const finishBoot = useCallback(() => setBooting(false), []);
 
   return (
-    <div className="flex min-h-dvh flex-col xl:h-dvh xl:overflow-hidden">
+    <div className="relative flex min-h-dvh flex-col xl:h-dvh xl:overflow-hidden">
+      <Atmosphere />
       <AnimatePresence>{booting && <BootSequence onDone={finishBoot} />}</AnimatePresence>
 
       {snapshot ? (
-        <>
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col">
           <TopBar
             snapshot={snapshot}
             connection={connection}
@@ -46,9 +48,9 @@ export function Terminal() {
           <TickerTape tokens={snapshot.watchlist} />
 
           <motion.main
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.12, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="grid min-h-0 flex-1 gap-2 p-2 xl:grid-cols-[264px_minmax(0,1fr)_336px]"
           >
             <div className="flex min-h-0 min-w-0 flex-col gap-2">
@@ -102,10 +104,22 @@ export function Terminal() {
             onApply={(patch) => void send({ type: "risk", patch })}
             onReset={() => void send({ type: "reset" })}
           />
-        </>
+        </div>
       ) : (
-        <div className="flex flex-1 items-center justify-center text-[12px]" style={{ color: "var(--text-muted)" }}>
-          connecting to the desk…
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4">
+          <div className="radar" aria-hidden>
+            <span className="radar-ring" />
+            <span className="radar-ring delay" />
+            <span className="radar-core" />
+          </div>
+          <div className="text-[12px] tracking-[0.18em] uppercase" style={{ color: "var(--text-muted)" }}>
+            connecting to the desk
+            <span className="thinking-dots">
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
+            </span>
+          </div>
         </div>
       )}
     </div>

@@ -74,7 +74,7 @@ export function PositionsPanel({
                     <button
                       type="button"
                       onClick={() => onClose(position.id)}
-                      className="rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider transition-colors hover:brightness-150"
+                      className="desk-btn rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider"
                       style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
                     >
                       close

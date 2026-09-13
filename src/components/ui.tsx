@@ -55,7 +55,7 @@ export function Pill({
   const c = colors[tone];
   return (
     <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-[filter] duration-150 hover:brightness-125"
       style={{ color: c.fg, background: c.bg }}
     >
       {glyph && <span aria-hidden>{glyph}</span>}
@@ -119,7 +119,12 @@ export function ScoreBar({ score, color }: { score: number; color: string }) {
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[80px] items-center justify-center px-4 py-6 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+    <div className="flex h-full min-h-[80px] flex-col items-center justify-center gap-2 px-4 py-6 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <span
+        className="pulse-dot inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: "var(--series-1)", ["--ring" as string]: "rgba(34,211,238,0.4)" }}
+        aria-hidden
+      />
       {children}
     </div>
   );

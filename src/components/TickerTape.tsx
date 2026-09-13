@@ -25,7 +25,10 @@ export function TickerTape({ tokens }: { tokens: Token[] }) {
                 {token.symbol}
               </span>
               <span style={{ color: "var(--text-secondary)" }}>{formatUsdPrice(token.priceUsd)}</span>
-              <span style={{ color: up ? "var(--pos-glow)" : "var(--neg-glow)" }}>
+              <span
+                className={up ? "tape-up" : "tape-down"}
+                style={{ color: up ? "var(--pos-glow)" : "var(--neg-glow)" }}
+              >
                 {arrow(token.change1h)} {formatPct(token.change1h)}
               </span>
               <span style={{ color: "var(--surface-3)" }}>│</span>

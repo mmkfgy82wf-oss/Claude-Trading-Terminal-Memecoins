@@ -20,8 +20,11 @@ export function ChainStatusBar({ statuses }: { statuses: ChainStatus[] }) {
         return (
           <span key={status.chain} className="inline-flex items-center gap-1.5">
             <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ background: live ? "var(--pos)" : "var(--warn)" }}
+              className="pulse-dot inline-block h-1.5 w-1.5 rounded-full"
+              style={{
+                background: live ? "var(--pos)" : "var(--warn)",
+                ["--ring" as string]: live ? "rgba(3,175,88,0.45)" : "rgba(217,115,11,0.45)",
+              }}
               aria-hidden
             />
             <span className="font-semibold" style={{ color: "var(--text-secondary)" }}>

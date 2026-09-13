@@ -104,6 +104,15 @@ Performance-Kurve entsteht nach den ersten Ticks
         />
         <path d={`${geometry.path} L${width},${height} L0,${height} Z`} fill={`url(#${gradientId})`} />
         <path d={geometry.path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" />
+        <circle
+          className="spark-tip"
+          cx={geometry.scaleX(points.length - 1)}
+          cy={geometry.scaleY(last)}
+          r={3.5}
+          fill={stroke}
+          stroke="var(--surface-1)"
+          strokeWidth={2}
+        />
 
         {hover && (
           <g>

@@ -42,7 +42,7 @@ export function AgentConsole({
       accent="var(--series-3)"
       scanline
       right={
-        <span className="tabular text-[10px]" style={{ color: "var(--text-muted)" }}>
+        <span key={tick} className="tick-pop tabular text-[10px]" style={{ color: "var(--text-muted)" }}>
           tick {tick}
         </span>
       }
@@ -59,8 +59,11 @@ export function AgentConsole({
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.06 }}
-              className="border-b px-3 py-2.5 last:border-b-0"
-              style={{ borderColor: "var(--grid-line)" }}
+              className={`border-b px-3 py-2 last:border-b-0 ${active ? "agent-live" : ""}`}
+              style={{
+                borderColor: "var(--grid-line)",
+                ["--agent" as string]: agent.color,
+              }}
             >
               <div className="flex items-center gap-2">
                 <span
@@ -100,8 +103,15 @@ export function AgentConsole({
                       style={{ background: color, ["--ring" as string]: `color-mix(in srgb, ${color} 55%, transparent)` }}
                       aria-hidden
                     />
-                    <span className="text-[9px] uppercase tracking-wider" style={{ color }}>
+                    <span className="inline-flex items-center text-[9px] uppercase tracking-wider" style={{ color }}>
                       {STATUS_LABEL[agent.status]}
+                      {agent.status === "thinking" && (
+                        <span className="thinking-dots" aria-hidden>
+                          <span>.</span>
+                          <span>.</span>
+                          <span>.</span>
+                        </span>
+                      )}
                     </span>
                     {/* Keyed on the text so a new activity fades in without
                         ever leaving the line blank between ticks. */}

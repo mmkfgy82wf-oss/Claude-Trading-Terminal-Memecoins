@@ -87,7 +87,7 @@ export function ApprovalQueue({
                     <button
                       type="button"
                       onClick={() => onApprove(approval.id)}
-                      className="flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-transform active:scale-95"
+                      className="desk-btn flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider"
                       style={{ background: "rgba(3,175,88,0.16)", color: "var(--pos-glow)", border: "1px solid rgba(3,175,88,0.4)" }}
                     >
                       ✓ approve
@@ -95,7 +95,7 @@ export function ApprovalQueue({
                     <button
                       type="button"
                       onClick={() => onReject(approval.id)}
-                      className="flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-transform active:scale-95"
+                      className="desk-btn flex-1 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider"
                       style={{ background: "rgba(229,72,77,0.12)", color: "var(--neg-glow)", border: "1px solid rgba(229,72,77,0.35)" }}
                     >
                       ✕ reject
