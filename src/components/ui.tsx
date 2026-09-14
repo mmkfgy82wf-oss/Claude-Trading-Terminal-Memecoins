@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function Panel({
   title,
@@ -55,7 +55,7 @@ export function Pill({
   const c = colors[tone];
   return (
     <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition-[filter] duration-150 hover:brightness-125"
       style={{ color: c.fg, background: c.bg }}
     >
       {glyph && <span aria-hidden>{glyph}</span>}
@@ -117,9 +117,52 @@ export function ScoreBar({ score, color }: { score: number; color: string }) {
   );
 }
 
+/** Tweens a number across ticks so the headline doesn't jump. */
+export function CountUp({
+  value,
+  format,
+}: {
+  value: number;
+  format: (n: number) => string;
+}) {
+  const [shown, setShown] = useState(value);
+  const fromRef = useRef(value);
+  useEffect(() => {
+    const reduce = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      setShown(value);
+      fromRef.current = value;
+      return;
+    }
+    const from = fromRef.current;
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / 420);
+      const eased = 1 - (1 - p) * (1 - p);
+      const next = from + (value - from) * eased;
+      setShown(next);
+      if (p < 1) raf = requestAnimationFrame(step);
+      else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(shown)}</>;
+}
+
+export function Kbd({ children }: { children: ReactNode }) {
+  return <kbd className="kbd">{children}</kbd>;
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full min-h-[80px] items-center justify-center px-4 py-6 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+    <div className="flex h-full min-h-[80px] flex-col items-center justify-center gap-2 px-4 py-6 text-center text-[11px]" style={{ color: "var(--text-muted)" }}>
+      <span
+        className="pulse-dot inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: "var(--series-1)", ["--ring" as string]: "rgba(34,211,238,0.4)" }}
+        aria-hidden
+      />
       {children}
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ROSTER } from "@/lib/agents/roster";
-import type { LogEntry } from "@/lib/types";
+import type { AgentId, LogEntry } from "@/lib/types";
 import { formatClock } from "@/lib/util/format";
 import { EmptyState, Panel } from "./ui";
 
@@ -25,25 +25,48 @@ const LEVEL_GLYPH: Record<LogEntry["level"], string> = {
 };
 
 /** The desk's running commentary — every agent decision, newest first. */
-export function SignalFeed({ logs, className }: { logs: LogEntry[]; className?: string }) {
+export function SignalFeed({
+  logs,
+  agentFilter,
+  onClearFilter,
+  className,
+}: {
+  logs: LogEntry[];
+  agentFilter?: AgentId | null;
+  onClearFilter?: () => void;
+  className?: string;
+}) {
+  const visible = agentFilter ? logs.filter((entry) => entry.agent === agentFilter) : logs;
+  const filterName = agentFilter ? ROSTER[agentFilter].name : null;
   return (
     <Panel
       title="signal feed"
       accent="var(--series-2)"
       right={
-        <span className="blink text-[10px]" style={{ color: "var(--series-1-glow)" }}>
-          ●
-        </span>
+        filterName ? (
+          <button
+            type="button"
+            onClick={onClearFilter}
+            className="desk-btn text-[9px] uppercase tracking-wider"
+            style={{ color: ROSTER[agentFilter!].color }}
+          >
+            {filterName} only ✕
+          </button>
+        ) : (
+          <span className="blink text-[10px]" style={{ color: "var(--series-1-glow)" }}>
+            ●
+          </span>
+        )
       }
       bodyClassName="overflow-y-auto"
       className={className}
     >
-      {logs.length === 0 ? (
-        <EmptyState>Waiting for the first tick…</EmptyState>
+      {visible.length === 0 ? (
+        <EmptyState>{agentFilter ? "This agent is quiet this session." : "Waiting for the first tick…"}</EmptyState>
       ) : (
         <ul className="flex flex-col">
           <AnimatePresence initial={false}>
-            {logs.slice(0, 60).map((entry) => {
+            {visible.slice(0, 60).map((entry) => {
               const agent = entry.agent === "system" ? null : ROSTER[entry.agent];
               return (
                 <motion.li

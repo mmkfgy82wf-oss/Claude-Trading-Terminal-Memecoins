@@ -15,18 +15,29 @@ export function Sparkline({
   width = 96,
   height = 26,
   positive,
+  fluid,
 }: {
   data: PricePoint[];
   width?: number;
   height?: number;
   positive?: boolean;
+  fluid?: boolean;
 }) {
   const gradientId = useId();
   const points = data.slice(-60);
 
   if (points.length < 2) {
     return (
-      <svg width={width} height={height} role="img" aria-label="no price history yet">
+      <svg
+        width={fluid ? undefined : width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        className={fluid ? "w-full" : undefined}
+        style={fluid ? { height } : undefined}
+        role="img"
+        aria-label="no price history yet"
+      >
         <line
           x1={0}
           y1={height / 2}
@@ -56,7 +67,16 @@ export function Sparkline({
   const lastY = scaleY(values[values.length - 1]);
 
   return (
-    <svg width={width} height={height} role="img" aria-label={`price trace, ${up ? "up" : "down"}`}>
+    <svg
+      width={fluid ? undefined : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className={fluid ? "w-full" : undefined}
+      style={fluid ? { height } : undefined}
+      role="img"
+      aria-label={`price trace, ${up ? "up" : "down"}`}
+    >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={stroke} stopOpacity={0.28} />
@@ -66,7 +86,7 @@ export function Sparkline({
       <path d={area} fill={`url(#${gradientId})`} />
       <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       {/* 2px surface ring keeps the marker readable where it overlaps the line */}
-      <circle cx={lastX} cy={lastY} r={3} fill={stroke} stroke="var(--surface-1)" strokeWidth={2} />
+      <circle className="spark-tip" cx={lastX} cy={lastY} r={3} fill={stroke} stroke="var(--surface-1)" strokeWidth={2} />
     </svg>
   );
 }

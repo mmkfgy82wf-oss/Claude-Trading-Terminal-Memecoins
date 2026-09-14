@@ -3,7 +3,7 @@
 import type { PortfolioSnapshot } from "@/lib/types";
 import { arrow, formatCompactUsd, formatPct, formatSignedUsd } from "@/lib/util/format";
 import { EquityCurve } from "./EquityCurve";
-import { Panel, StatTile } from "./ui";
+import { CountUp, Panel, StatTile } from "./ui";
 
 /**
  * Portfolio state. The hero number is equity; everything else is context for
@@ -37,12 +37,17 @@ export function PortfolioPanel({
             <div className="text-[9px] uppercase tracking-[0.16em]" style={{ color: "var(--text-muted)" }}>
               equity
             </div>
-            <div
-              className="tabular text-[30px] font-bold leading-none"
-              style={{ color: "var(--text-primary)", textShadow: "0 0 26px rgba(34,211,238,0.16)" }}
-            >
-              ${portfolio.equityUsd.toLocaleString("en-US", { maximumFractionDigits: 0 })}
-              <span className="ml-1.5 text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <div
+                className={`tabular text-[30px] font-bold leading-none ${up ? "glow-pos" : "glow-neg"}`}
+                style={{ color: "var(--text-primary)", textShadow: up ? "0 0 28px rgba(74,222,128,0.22)" : "0 0 28px rgba(255,99,105,0.18)" }}
+              >
+                <CountUp
+                  value={portfolio.equityUsd}
+                  format={(n) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`}
+                />
+              </div>
+              <span className="text-[13px] font-medium" style={{ color: "var(--text-secondary)" }}>
                 total book
               </span>
             </div>

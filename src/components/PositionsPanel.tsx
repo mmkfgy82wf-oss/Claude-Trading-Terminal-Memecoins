@@ -13,10 +13,12 @@ import { EmptyState, Panel } from "./ui";
 export function PositionsPanel({
   positions,
   onClose,
+  onInspect,
   className,
 }: {
   positions: Position[];
   onClose: (positionId: string) => void;
+  onInspect?: (tokenId: string) => void;
   className?: string;
 }) {
   return (
@@ -53,8 +55,9 @@ export function PositionsPanel({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="border-b px-3 py-2 last:border-b-0"
+                  className="cursor-pointer border-b px-3 py-2 last:border-b-0"
                   style={{ borderColor: "var(--grid-line)" }}
+                  onClick={() => onInspect?.(position.tokenId)}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold">{position.symbol}</span>
@@ -76,8 +79,11 @@ export function PositionsPanel({
                     </span>
                     <button
                       type="button"
-                      onClick={() => onClose(position.id)}
-                      className="rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider transition-colors hover:brightness-150"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onClose(position.id);
+                      }}
+                      className="desk-btn rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wider"
                       style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
                     >
                       close

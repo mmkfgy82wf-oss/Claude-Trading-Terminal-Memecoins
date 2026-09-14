@@ -1,9 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CHAINS } from "@/lib/market/chains";
-import { ROSTER } from "@/lib/agents/roster";
 import type { ConsensusView, Token } from "@/lib/types";
 import {
   arrow,
@@ -38,17 +36,69 @@ const VERDICT_GLYPH: Record<ConsensusView["verdict"], string> = {
  * stated reasons — because an autonomous desk is only trustworthy if you can
  * see why it wanted something.
  */
+type Filter = "all" | ConsensusView["verdict"];
+type SortKey = "score" | "change1h" | "liq" | "age";
+
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "all" },
+  { id: "strong-buy", label: "strong" },
+  { id: "buy", label: "buy" },
+  { id: "watch", label: "watch" },
+  { id: "avoid", label: "avoid" },
+  { id: "vetoed", label: "veto" },
+];
+
 export function WatchlistPanel({
   consensus,
   tokens,
+  selectedId,
+  onInspect,
   className,
 }: {
   consensus: ConsensusView[];
   tokens: Token[];
+  selectedId?: string | null;
+  onInspect?: (tokenId: string) => void;
   className?: string;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const byId = new Map(tokens.map((t) => [t.id, t]));
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [sort, setSort] = useState<SortKey>("score");
+  const byId = useMemo(() => new Map(tokens.map((t) => [t.id, t])), [tokens]);
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = consensus.filter((view) => {
+      const token = byId.get(view.tokenId);
+      if (!token) return false;
+      if (filter !== "all" && view.verdict !== filter) return false;
+      if (q && !token.symbol.toLowerCase().includes(q) && !token.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const ranked = [...list];
+    ranked.sort((a, b) => {
+      const ta = byId.get(a.tokenId);
+      const tb = byId.get(b.tokenId);
+      if (!ta || !tb) return 0;
+      if (sort === "score") return b.score - a.score;
+      if (sort === "change1h") return tb.change1h - ta.change1h;
+      if (sort === "liq") return tb.liquidityUsd - ta.liquidityUsd;
+      return ta.ageMinutes - tb.ageMinutes;
+    });
+    return ranked;
+  }, [byId, consensus, filter, query, sort]);
+
+  const headers: { key: string; sort?: SortKey }[] = [
+    { key: "token" },
+    { key: "price" },
+    { key: "5m" },
+    { key: "1h", sort: "change1h" },
+    { key: "liq", sort: "liq" },
+    { key: "age", sort: "age" },
+    { key: "trace" },
+    { key: "consensus", sort: "score" },
+    { key: "" },
+  ];
 
   return (
     <Panel
@@ -56,46 +106,71 @@ export function WatchlistPanel({
       accent="var(--series-1)"
       right={
         <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
-          {consensus.length} tracked
+          {rows.length}/{consensus.length}
         </span>
       }
       bodyClassName="overflow-y-auto"
       className={className}
     >
+      <div className="flex flex-wrap items-center gap-1.5 border-b px-2 py-1.5" style={{ borderColor: "var(--grid-line)" }}>
+        <input
+          className="board-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="search ⌕"
+          aria-label="Filter the board by symbol"
+        />
+        {FILTERS.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            className="filter-chip"
+            data-on={filter === chip.id}
+            onClick={() => setFilter(chip.id)}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
       {consensus.length === 0 ? (
         <EmptyState>SCOUT is still building the first watchlist…</EmptyState>
+      ) : rows.length === 0 ? (
+        <EmptyState>Nothing on the board matches that filter.</EmptyState>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[620px] border-collapse text-[11px]">
           <thead className="sticky top-0 z-10" style={{ background: "var(--surface-1)" }}>
             <tr style={{ color: "var(--text-muted)" }}>
-              {["token", "price", "5m", "1h", "liq", "age", "trace", "consensus", ""].map((h) => (
+              {headers.map((h) => (
                 <th
-                  key={h}
+                  key={h.key}
                   className="border-b px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.12em]"
-                  style={{ borderColor: "var(--grid-line)" }}
+                  style={{ borderColor: "var(--grid-line)", cursor: h.sort ? "pointer" : undefined }}
+                  onClick={h.sort ? () => setSort(h.sort!) : undefined}
                 >
-                  {h}
+                  {h.key}
+                  {h.sort && sort === h.sort ? " ▾" : ""}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {consensus.map((view) => {
+            {rows.map((view) => {
               const token = byId.get(view.tokenId);
               if (!token) return null;
-              const open = expanded === view.tokenId;
+              const selected = selectedId === view.tokenId;
               const chain = CHAINS[view.chain];
+              const hot = view.verdict === "strong-buy";
 
               return (
-                <motion.tr
+                <tr
                   key={view.tokenId}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                  className="cursor-pointer border-b transition-colors hover:bg-[rgba(255,255,255,0.03)]"
-                  style={{ borderColor: "var(--grid-line)" }}
-                  onClick={() => setExpanded(open ? null : view.tokenId)}
+                  className={`cursor-pointer border-b transition-colors hover:bg-[rgba(34,211,238,0.045)] ${hot ? "row-hot" : ""}`}
+                  style={{
+                    borderColor: "var(--grid-line)",
+                    background: selected ? "rgba(34,211,238,0.08)" : undefined,
+                  }}
+                  onClick={() => onInspect?.(view.tokenId)}
                 >
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-1.5">
@@ -156,76 +231,13 @@ export function WatchlistPanel({
                       {view.verdict.replace("-", " ")}
                     </Pill>
                   </td>
-                </motion.tr>
+                </tr>
               );
             })}
           </tbody>
           </table>
         </div>
       )}
-
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            key={expanded}
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t"
-            style={{ borderColor: "var(--grid-line)", background: "var(--surface-2)" }}
-          >
-            <AuditTrail view={consensus.find((c) => c.tokenId === expanded)} />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </Panel>
-  );
-}
-
-function AuditTrail({ view }: { view?: ConsensusView }) {
-  if (!view) return null;
-  return (
-    <div className="px-3 py-2">
-      <div className="mb-1.5 text-[9px] uppercase tracking-[0.16em]" style={{ color: "var(--text-muted)" }}>
-        audit trail · {view.symbol} · confidence {(view.confidence * 100).toFixed(0)}%
-      </div>
-      <div className="grid gap-1.5 sm:grid-cols-2">
-        {view.signals.map((signal) => {
-          const agent = ROSTER[signal.agent];
-          return (
-            <div
-              key={`${signal.agent}-${signal.createdAt}`}
-              className="rounded border px-2 py-1.5"
-              style={{ borderColor: "var(--grid-line)", background: "var(--surface-1)" }}
-            >
-              <div className="flex items-center gap-1.5">
-                <span style={{ color: agent.color }} aria-hidden>
-                  {agent.glyph}
-                </span>
-                <span className="text-[10px] font-bold tracking-wider" style={{ color: agent.color }}>
-                  {agent.name}
-                </span>
-                <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>
-                  {signal.label}
-                </span>
-                <span
-                  className="tabular ml-auto text-[10px] font-semibold"
-                  style={{ color: signal.veto ? "var(--neg-glow)" : "var(--text-primary)" }}
-                >
-                  {signal.veto ? "VETO" : signal.score.toFixed(0)}
-                </span>
-              </div>
-              <ul className="mt-1 space-y-0.5">
-                {signal.reasons.map((reason, i) => (
-                  <li key={i} className="text-[10px] leading-snug" style={{ color: "var(--text-muted)" }}>
-                    ▸ {reason}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }

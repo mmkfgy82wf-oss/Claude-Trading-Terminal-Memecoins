@@ -5,20 +5,31 @@ import { useEffect, useState } from "react";
 import type { TerminalSnapshot } from "@/lib/types";
 import { arrow, formatCompactUsd, formatPct } from "@/lib/util/format";
 import type { ConnectionState } from "@/lib/useTerminal";
-import { Pill } from "./ui";
+import { LogoMark } from "./LogoMark";
+import { CountUp, Pill } from "./ui";
 
 export function TopBar({
   snapshot,
   connection,
+  sessionStartedAt,
+  sound,
   onAutonomy,
   onKill,
   onOpenSettings,
+  onOpenPalette,
+  onOpenHelp,
+  onToggleSound,
 }: {
   snapshot: TerminalSnapshot;
   connection: ConnectionState;
+  sessionStartedAt: number;
+  sound: boolean;
   onAutonomy: (mode: "auto" | "manual") => void;
   onKill: (on: boolean) => void;
   onOpenSettings: () => void;
+  onOpenPalette: () => void;
+  onOpenHelp: () => void;
+  onToggleSound: () => void;
 }) {
   const [clock, setClock] = useState("--:--:--");
   useEffect(() => {
@@ -34,11 +45,17 @@ export function TopBar({
   return (
     <header
       className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-3 py-2"
-      style={{ borderColor: "var(--grid-line)", background: "rgba(14,16,23,0.82)", backdropFilter: "blur(10px)" }}
+      style={{
+        borderColor: "var(--grid-line)",
+        background: "rgba(14,16,23,0.78)",
+        backdropFilter: "blur(14px)",
+        boxShadow: "0 1px 0 color-mix(in srgb, var(--series-1) 28%, transparent)",
+      }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
+        <LogoMark size={20} />
         <motion.span
-          className="text-[15px] font-bold tracking-[0.2em]"
+          className="glitch-title text-[15px] font-bold tracking-[0.2em]"
           style={{ color: "var(--series-1-glow)", textShadow: "0 0 18px rgba(34,211,238,0.5)" }}
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
@@ -75,9 +92,11 @@ export function TopBar({
           <span className="text-[9px] uppercase tracking-[0.16em]" style={{ color: "var(--text-muted)" }}>
             equity
           </span>
-          <span className="text-[14px] font-semibold">{formatCompactUsd(portfolio.equityUsd)}</span>
+          <span className="text-[14px] font-semibold">
+            <CountUp value={portfolio.equityUsd} format={formatCompactUsd} />
+          </span>
           <span
-            className="text-[11px] font-semibold"
+            className={`text-[11px] font-semibold ${pnlPositive ? "glow-pos" : "glow-neg"}`}
             style={{ color: pnlPositive ? "var(--pos-glow)" : "var(--neg-glow)" }}
           >
             {arrow(portfolio.totalPnlPct)} {formatPct(portfolio.totalPnlPct)}
@@ -111,8 +130,41 @@ export function TopBar({
 
         <button
           type="button"
+          onClick={onOpenPalette}
+          className="desk-btn hidden items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider sm:inline-flex"
+          style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
+          title="Command palette"
+        >
+          ⌕ <kbd className="kbd">⌘K</kbd>
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleSound}
+          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
+          style={{
+            borderColor: sound ? "color-mix(in srgb, var(--series-1) 45%, var(--grid-line))" : "var(--grid-line)",
+            color: sound ? "var(--series-1-glow)" : "var(--text-secondary)",
+          }}
+          title="Desk sounds"
+        >
+          {sound ? "♪ on" : "♪ off"}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
+          style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
+          title="Keyboard shortcuts"
+        >
+          ?
+        </button>
+
+        <button
+          type="button"
           onClick={onOpenSettings}
-          className="rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider transition-colors hover:brightness-125"
+          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
           style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
         >
           ⚙ risk
@@ -122,7 +174,8 @@ export function TopBar({
           type="button"
           onClick={() => onKill(!flags.killSwitch)}
           whileTap={{ scale: 0.95 }}
-          className="rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em]"
+          whileHover={{ scale: 1.03 }}
+          className="desk-btn rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em]"
           style={{
             background: flags.killSwitch ? "var(--neg)" : "rgba(229,72,77,0.12)",
             color: flags.killSwitch ? "#fff" : "var(--neg-glow)",
@@ -133,10 +186,24 @@ export function TopBar({
           {flags.killSwitch ? "◼ halted — release" : "◼ kill switch"}
         </motion.button>
 
+        <span className="tabular hidden text-[10px] uppercase tracking-wider lg:inline" style={{ color: "var(--text-muted)" }} title="session length">
+          {formatSession(sessionStartedAt)}
+        </span>
         <span className="tabular hidden text-[11px] md:inline" style={{ color: "var(--text-secondary)" }}>
-          {clock}
+          {clock.slice(0, -3)}
+          <span className="blink">:</span>
+          {clock.slice(-2)}
         </span>
       </div>
     </header>
   );
+}
+
+function formatSession(startedAt: number): string {
+  const s = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m.toString().padStart(2, "0")}m`;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
 }
