@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type { Position } from "@/lib/types";
 import { CHAINS } from "@/lib/market/chains";
 import { arrow, formatNative, formatPct, formatUsdPrice, relativeTime } from "@/lib/util/format";
-import { EmptyState, Panel } from "./ui";
+import { EmptyState, Panel, TokenChip } from "./ui";
 
 /**
  * Open positions, with the exit plan made visible: where the stop sits, which
@@ -55,11 +55,12 @@ export function PositionsPanel({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="cursor-pointer border-b px-3 py-2 last:border-b-0"
+                  className={`cursor-pointer border-b px-3 py-2 last:border-b-0 ${up ? "pos-wash" : "neg-wash"}`}
                   style={{ borderColor: "var(--grid-line)" }}
                   onClick={() => onInspect?.(position.tokenId)}
                 >
                   <div className="flex items-center gap-2">
+                    <TokenChip symbol={position.symbol} size={16} />
                     <span className="text-[11px] font-bold">{position.symbol}</span>
                     <span
                       className="rounded px-1 text-[8px] uppercase tracking-wider"

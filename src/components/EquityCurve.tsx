@@ -86,7 +86,7 @@ Performance-Kurve entsteht nach den ersten Ticks
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity={0.26} />
+            <stop offset="0%" stopColor={stroke} stopOpacity={0.38} />
             <stop offset="100%" stopColor={stroke} stopOpacity={0} />
           </linearGradient>
         </defs>
@@ -103,7 +103,7 @@ Performance-Kurve entsteht nach den ersten Ticks
           opacity={0.5}
         />
         <path d={`${geometry.path} L${width},${height} L0,${height} Z`} fill={`url(#${gradientId})`} />
-        <path d={geometry.path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" />
+        <path d={geometry.path} fill="none" stroke={stroke} strokeWidth={2.4} strokeLinejoin="round" />
         <circle
           className="spark-tip"
           cx={geometry.scaleX(points.length - 1)}

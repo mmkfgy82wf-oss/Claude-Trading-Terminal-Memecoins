@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CHAINS } from "@/lib/market/chains";
 import type { ConsensusView, Token } from "@/lib/types";
 import { formatPct } from "@/lib/util/format";
+import { TokenChip } from "./ui";
 
 interface Command {
   id: string;
@@ -139,6 +140,7 @@ export function CommandPalette({
                         className="flex w-full items-center gap-2 px-3 py-1.5 text-left"
                         style={{ background: selected ? "rgba(34,211,238,0.1)" : "transparent" }}
                       >
+                        <TokenChip symbol={token.symbol} size={16} />
                         <span className="w-20 truncate text-[12px] font-bold">{token.symbol}</span>
                         <span className="text-[9px] uppercase" style={{ color: "var(--text-muted)" }}>
                           {CHAINS[token.chain].tag}

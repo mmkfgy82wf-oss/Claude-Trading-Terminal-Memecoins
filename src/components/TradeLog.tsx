@@ -12,7 +12,7 @@ import {
   formatPct,
   formatUsdPrice,
 } from "@/lib/util/format";
-import { EmptyState, Panel } from "./ui";
+import { EmptyState, Panel, TokenChip } from "./ui";
 
 /**
  * Two views of the same history at different grain.
@@ -183,10 +183,11 @@ function TradeRow({ trade, best }: { trade: ClosedTrade; best: number }) {
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className="border-b px-2.5 py-2 last:border-b-0"
+      className={`border-b px-2.5 py-2 last:border-b-0 ${won ? "pos-wash" : "neg-wash"}`}
       style={{ borderColor: "rgba(30,36,51,0.55)" }}
     >
       <div className="flex items-center gap-2">
+        <TokenChip symbol={trade.symbol} size={16} />
         <span
           className="shrink-0 rounded px-1 text-[9px] font-bold uppercase"
           style={{ color: glow, background: won ? "rgba(3,175,88,0.14)" : "rgba(229,72,77,0.14)" }}

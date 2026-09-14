@@ -16,12 +16,14 @@ export function Sparkline({
   height = 26,
   positive,
   fluid,
+  strokeWidth = 2,
 }: {
   data: PricePoint[];
   width?: number;
   height?: number;
   positive?: boolean;
   fluid?: boolean;
+  strokeWidth?: number;
 }) {
   const gradientId = useId();
   const points = data.slice(-60);
@@ -39,13 +41,15 @@ export function Sparkline({
         aria-label="no price history yet"
       >
         <line
+          className="spark-tip"
           x1={0}
           y1={height / 2}
           x2={width}
           y2={height / 2}
-          stroke="var(--surface-3)"
-          strokeWidth={2}
-          strokeDasharray="3 3"
+          stroke="var(--text-muted)"
+          strokeWidth={1.5}
+          strokeDasharray="4 5"
+          opacity={0.45}
         />
       </svg>
     );
@@ -79,12 +83,12 @@ export function Sparkline({
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity={0.28} />
+          <stop offset="0%" stopColor={stroke} stopOpacity={fluid ? 0.42 : 0.28} />
           <stop offset="100%" stopColor={stroke} stopOpacity={0} />
         </linearGradient>
       </defs>
       <path d={area} fill={`url(#${gradientId})`} />
-      <path d={path} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={path} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" />
       {/* 2px surface ring keeps the marker readable where it overlaps the line */}
       <circle className="spark-tip" cx={lastX} cy={lastY} r={3} fill={stroke} stroke="var(--surface-1)" strokeWidth={2} />
     </svg>

@@ -2,6 +2,7 @@
 
 import type { Token } from "@/lib/types";
 import { arrow, formatPct, formatUsdPrice } from "@/lib/util/format";
+import { TokenChip } from "./ui";
 
 /**
  * The scrolling tape. Duplicated once so the marquee loops seamlessly at -50%;
@@ -29,9 +30,10 @@ export function TickerTape({
             <button
               key={`${token.id}-${i}`}
               type="button"
-              className="tape-item tabular mx-4 inline-flex shrink-0 items-baseline gap-1.5 text-[11px]"
+              className="tape-item tabular mx-4 inline-flex shrink-0 items-center gap-1.5 text-[11px]"
               onClick={() => onInspect?.(token.id)}
             >
+              <TokenChip symbol={token.symbol} size={14} />
               <span className="font-semibold" style={{ color: "var(--text-primary)" }}>
                 {token.symbol}
               </span>

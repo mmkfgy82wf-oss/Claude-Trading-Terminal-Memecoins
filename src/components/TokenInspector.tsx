@@ -14,7 +14,7 @@ import {
   formatUsdPrice,
 } from "@/lib/util/format";
 import { Sparkline } from "./Sparkline";
-import { Pill, ScoreBar } from "./ui";
+import { Pill, ScoreBar, TokenChip } from "./ui";
 
 const VERDICT_TONE: Record<ConsensusView["verdict"], "pos" | "info" | "neutral" | "neg"> = {
   "strong-buy": "pos",
@@ -79,6 +79,7 @@ export function TokenInspector({
           >
             <header className="panel-header shrink-0">
               <div className="flex min-w-0 items-center gap-2">
+                <TokenChip symbol={token.symbol} size={22} />
                 <h2 className="truncate text-[15px] font-bold tracking-wider">{token.symbol}</h2>
                 <span
                   className="rounded px-1 text-[8px] uppercase tracking-wider"
@@ -113,8 +114,8 @@ export function TokenInspector({
                 </div>
               </div>
 
-              <div className="mt-2 px-1">
-                <Sparkline data={token.history} width={440} height={110} positive={token.change1h >= 0} fluid />
+              <div className="chart-well mx-3 mt-3" style={{ ["--accent" as string]: token.change1h >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                <Sparkline data={token.history} width={440} height={132} positive={token.change1h >= 0} fluid strokeWidth={2.4} />
               </div>
 
               <div

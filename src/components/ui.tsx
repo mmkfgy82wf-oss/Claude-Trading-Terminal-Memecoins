@@ -28,7 +28,10 @@ export function Panel({
     >
       {scanline && <div className="scanline" />}
       <header className="panel-header shrink-0">
-        <h2 className="panel-title">{title}</h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="panel-dot" aria-hidden />
+          <h2 className="panel-title">{title}</h2>
+        </div>
         {right}
       </header>
       <div className={clsx("min-h-0 flex-1", bodyClassName)}>{children}</div>
@@ -153,6 +156,31 @@ export function CountUp({
 
 export function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="kbd">{children}</kbd>;
+}
+
+/** Two-letter chip so a symbol is recognisable before you read the ticker. */
+export function TokenChip({ symbol, size = 18 }: { symbol: string; size?: number }) {
+  let hash = 0;
+  for (let i = 0; i < symbol.length; i++) hash = (hash * 33 + symbol.charCodeAt(i)) >>> 0;
+  const hue = hash % 360;
+  const letters = symbol.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded font-bold"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(8, Math.round(size * 0.42)),
+        background: `hsl(${hue} 42% 16%)`,
+        color: `hsl(${hue} 72% 72%)`,
+        border: `1px solid hsl(${hue} 38% 30%)`,
+        textShadow: `0 0 8px hsl(${hue} 70% 50% / 0.4)`,
+      }}
+      aria-hidden
+    >
+      {letters}
+    </span>
+  );
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {

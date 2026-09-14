@@ -13,7 +13,7 @@ export function ToastStack({
   onDismiss: (id: string) => void;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-10 left-3 z-[80] flex w-[min(300px,calc(100%-24px))] flex-col-reverse gap-2">
+    <div className="pointer-events-none fixed top-16 right-3 z-[80] flex w-[min(300px,calc(100%-24px))] flex-col gap-2 sm:top-auto sm:bottom-10 sm:left-3 sm:right-auto sm:flex-col-reverse">
       <AnimatePresence>
         {burst && (
           <motion.div

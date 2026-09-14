@@ -11,7 +11,7 @@ import {
   formatUsdPrice,
 } from "@/lib/util/format";
 import { Sparkline } from "./Sparkline";
-import { EmptyState, Panel, Pill, ScoreBar } from "./ui";
+import { EmptyState, Panel, Pill, ScoreBar, TokenChip } from "./ui";
 
 const VERDICT_TONE: Record<ConsensusView["verdict"], "pos" | "info" | "neutral" | "neg"> = {
   "strong-buy": "pos",
@@ -174,6 +174,7 @@ export function WatchlistPanel({
                 >
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-1.5">
+                      <TokenChip symbol={token.symbol} size={16} />
                       <span className="font-semibold">{token.symbol}</span>
                       <span
                         className="rounded px-1 text-[8px] uppercase tracking-wider"

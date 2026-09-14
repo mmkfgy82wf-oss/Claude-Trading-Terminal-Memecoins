@@ -131,32 +131,27 @@ export function TopBar({
         <button
           type="button"
           onClick={onOpenPalette}
-          className="desk-btn hidden items-center gap-1 rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider sm:inline-flex"
-          style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
-          title="Command palette"
+          className="icon-btn desk-btn hidden sm:inline-flex"
+          title="Command palette (⌘K)"
         >
-          ⌕ <kbd className="kbd">⌘K</kbd>
+          ⌕
         </button>
 
         <button
           type="button"
           onClick={onToggleSound}
-          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
-          style={{
-            borderColor: sound ? "color-mix(in srgb, var(--series-1) 45%, var(--grid-line))" : "var(--grid-line)",
-            color: sound ? "var(--series-1-glow)" : "var(--text-secondary)",
-          }}
+          className="icon-btn desk-btn"
+          data-on={sound}
           title="Desk sounds"
         >
-          {sound ? "♪ on" : "♪ off"}
+          ♪
         </button>
 
         <button
           type="button"
           onClick={onOpenHelp}
-          className="desk-btn rounded-md border px-2 py-1 text-[10px] uppercase tracking-wider"
-          style={{ borderColor: "var(--grid-line)", color: "var(--text-secondary)" }}
-          title="Keyboard shortcuts"
+          className="icon-btn desk-btn"
+          title="Keyboard shortcuts (?)"
         >
           ?
         </button>
@@ -190,9 +185,7 @@ export function TopBar({
           {formatSession(sessionStartedAt)}
         </span>
         <span className="tabular hidden text-[11px] md:inline" style={{ color: "var(--text-secondary)" }}>
-          {clock.slice(0, -3)}
-          <span className="blink">:</span>
-          {clock.slice(-2)}
+          {clock}
         </span>
       </div>
     </header>
