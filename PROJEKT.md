@@ -145,6 +145,14 @@ Information — SENTINEL vetoed die meisten zu Recht auf Liquidität) und kurz v
 der Graduation (Kurve gefüllt, echtes Geld drin, Migration in einen echten Pool
 steht an — hier greifen die Liquiditätsschwellen tatsächlich).
 
+Auf **Robinhood Chain** übernimmt **Pons** diese Rolle — Ende August 2026 nahm
+es mehr Launchpad-Gebühren ein als Pump.fun (4,89 gegen 1,72 Mio. $ an einem
+Tag). Es veröffentlicht aber keine offene REST-API; der dokumentierte Weg führt
+über Bitquery-GraphQL und braucht einen Token. Deshalb werden Launches dort über
+**neue Pools** erfasst: Die entstehen, sobald ein Token handelbar wird, und das
+ist der erste Zeitpunkt, an dem der Desk überhaupt eine Position aufbauen könnte
+— vor einem Pool gibt es nichts, wogegen sich eine Größe bemessen ließe.
+
 pump.fun hat **keine offizielle Daten-API**; genutzt wird die undokumentierte
 Frontend-API. Der Parser toleriert deshalb umbenannte und fehlende Felder, und
 das Modul liefert im Zweifel eine leere Liste statt einen Tick zu brechen.
@@ -242,7 +250,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 69, alle grün (`npm test`)
+### Unit-Tests — 74, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -342,7 +350,8 @@ Konsolenfehler. Beides sauber.
 src/lib/types.ts                 Gemeinsames Vokabular (auch das SSE-Wire-Format)
 src/lib/market/chains.ts         Chain-Registry (Solana, Robinhood Chain)
 src/lib/market/dexscreener.ts    Live-Client (Pricing), fällt nie hart aus
-src/lib/market/pumpfun.ts        Launchpad-Discovery: was ist neu?
+src/lib/market/pumpfun.ts        Launchpad-Discovery Solana: was ist neu?
+src/lib/market/geckoterminal.ts  Neue Pools: was ist gerade handelbar geworden?
 src/lib/market/simulator.ts      Memecoin-Simulator mit Archetypen
 src/lib/market/feed.ts           Vereinheitlichter Feed, live ↔ simuliert
 src/lib/market/providers.ts      Optionale Anreicherung (Birdeye, Helius, SOL-Preis)
@@ -356,5 +365,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  69 Unit-Tests
+tests/*.test.ts                  74 Unit-Tests
 ```

@@ -42,7 +42,7 @@ Ohne Keys läuft alles vollständig — nur mit weniger Signalquellen.
 npm run dev        # Entwicklungsserver
 npm run build      # Produktions-Build
 npm start          # Produktionsserver
-npm test           # Unit-Tests (69)
+npm test           # Unit-Tests (74)
 npm run typecheck  # TypeScript ohne Emit
 npm run phone         # LAN-URL + QR-Code fürs Handy
 npm run check-sources # prüft alle Datenquellen von deinem Netz aus
@@ -56,7 +56,14 @@ Zwei Quellen beantworten zwei verschiedene Fragen:
 | Quelle | Frage | Key nötig |
 |---|---|---|
 | **pump.fun** (Solana) | Was wurde gerade gelauncht? | nein |
+| **Neue Pools** (beide Chains) | Was ist gerade handelbar geworden? | nein |
 | **DexScreener** | Was ist es wert, und wie tief ist der Pool? | nein |
+
+Auf Robinhood Chain dominiert **Pons** die Launches — Ende August 2026 nahm es
+mehr Launchpad-Gebühren ein als Pump.fun. Pons hat aber keine offene REST-API
+(der dokumentierte Weg ist Bitquery-GraphQL und braucht einen Token), deshalb
+werden Launches dort über den Pool erfasst, der entsteht, sobald ein Token
+handelbar wird — der erste Moment, in dem der Desk ohnehin handeln könnte.
 
 Das ist bewusst getrennt: Eine Textsuche kann neue Launches nicht finden — ein
 Coin von vor zehn Minuten heißt nichts, wonach jemand sucht. Das Launchpad weiß,

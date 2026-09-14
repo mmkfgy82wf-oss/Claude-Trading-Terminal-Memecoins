@@ -1,6 +1,7 @@
 import type { ChainId, ChainStatus, MarketMode, Token } from "@/lib/types";
 import { CHAINS } from "./chains";
 import { fetchChainPairs, fetchPairsForTokens, knownSlug, refreshPairs } from "./dexscreener";
+import { fetchNewPoolTokens, geckoterminalReachable } from "./geckoterminal";
 import { fetchNewMints, pumpfunReachable } from "./pumpfun";
 import { MarketSimulator } from "./simulator";
 
@@ -134,7 +135,11 @@ export class ChainFeed {
       this.evictStale(protectedIds);
       this.mode = "live";
       const slug = knownSlug(this.chain);
-      const launchpad = this.chain === "solana" && pumpfunReachable() ? " + pump.fun" : "";
+      const sources = [
+        this.chain === "solana" && pumpfunReachable() ? "pump.fun" : null,
+        geckoterminalReachable() ? "new pools" : null,
+      ].filter(Boolean);
+      const launchpad = sources.length ? ` + ${sources.join(" + ")}` : "";
       this.note = `Live via DexScreener${slug ? ` (${slug})` : ""}${launchpad} · ${this.tokens.size} pairs${this.launchpadHits ? `, ${this.launchpadHits} fresh launches` : ""}.`;
       this.lastFetchAt = Date.now();
       return [...this.tokens.values()];
@@ -144,18 +149,26 @@ export class ChainFeed {
   }
 
   /**
-   * New launches, straight from the launchpad, priced by the aggregator.
-   * Solana only for now — pump.fun is the largest launchpad there, and no
-   * equivalent single venue dominates the EVM side.
+   * Fresh launches, from whichever source this chain actually exposes.
+   *
+   * Solana has pump.fun, whose feed answers "what just launched" before a pool
+   * exists. Robinhood Chain's dominant launchpad is Pons, which publishes no
+   * open REST API, so new pools stand in — they appear the moment a launch
+   * becomes tradable, which is the first point the desk could act on anyway.
+   * Both sources return addresses only; the aggregator prices them.
    */
   private async discoverFromLaunchpad(): Promise<Token[]> {
-    if (this.chain !== "solana") return [];
     try {
-      const mints = await fetchNewMints(50);
-      if (mints.length === 0) return [];
+      const [mints, poolTokens] = await Promise.all([
+        this.chain === "solana" ? fetchNewMints(50) : Promise.resolve([]),
+        fetchNewPoolTokens(this.chain),
+      ]);
+
+      const addresses = [...new Set([...mints.map((m) => m.mint), ...poolTokens])];
+      if (addresses.length === 0) return [];
       // The launchpad knows what exists; only the aggregator knows whether
       // there is a pool deep enough to get back out of.
-      return await fetchPairsForTokens(this.chain, mints.map((m) => m.mint));
+      return await fetchPairsForTokens(this.chain, addresses);
     } catch {
       return [];
     }

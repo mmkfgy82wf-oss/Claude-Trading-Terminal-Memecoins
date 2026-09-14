@@ -21,6 +21,11 @@ export interface ChainAdapter {
    * probes these in order and locks onto whichever actually returns pairs.
    */
   dexscreenerSlugs: string[];
+  /**
+   * GeckoTerminal's network id, for the key-free new-pools feed. Null when the
+   * chain is not listed there.
+   */
+  geckoterminalNetwork: string | null;
   /** Search terms used to discover trending pairs on this chain. */
   discoveryQueries: string[];
   /** Explorer URL builder for an address. */
@@ -39,6 +44,7 @@ export const CHAINS: Record<ChainId, ChainAdapter> = {
     // DEX fee plus a priority fee large enough to land in a contested block.
     fee: { rate: 0.0025, flat: 0.00045 },
     dexscreenerSlugs: ["solana"],
+    geckoterminalNetwork: "solana",
     discoveryQueries: ["SOL", "pump", "bonk", "wif", "moon"],
     explorer: (a) => `https://solscan.io/account/${a}`,
     note: "Raydium, Pump.fun, Meteora, Orca.",
@@ -56,9 +62,15 @@ export const CHAINS: Record<ChainId, ChainAdapter> = {
     // "robinhood" is what the aggregators appear to use; the longer forms are
     // kept as fallbacks so a rename does not silently drop the chain to simulated.
     dexscreenerSlugs: ["robinhood", "robinhoodchain", "robinhood-chain"],
+    geckoterminalNetwork: "robinhood",
     discoveryQueries: ["ETH", "USDC", "robinhood", "moon", "meme"],
     explorer: (a) => `https://robinhoodchain.blockscout.com/address/${a}`,
-    note: "Uniswap and Pleiades AMMs.",
+    // Pons is the dominant launchpad here — by late August 2026 it was taking
+    // more launchpad fees than pump.fun. It publishes no open REST API (the
+    // documented route is Bitquery's GraphQL, which needs a token), so fresh
+    // launches are picked up from the pool that appears when one becomes
+    // tradable.
+    note: "Pons launchpad, Uniswap and Pleiades AMMs.",
   },
 };
 

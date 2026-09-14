@@ -54,9 +54,23 @@ if (pump) {
 }
 
 await probe(
-  "GeckoTerminal (new pools)",
+  "New pools (Solana)",
   "https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1",
   (j) => `${j.data?.length ?? 0} pools created in the last 48h`,
+);
+
+// Robinhood Chain's launchpad, Pons, publishes no open REST API, so this is the
+// key-free way to see what launched there.
+await probe(
+  "New pools (Robinhood/Pons)",
+  "https://api.geckoterminal.com/api/v2/networks/robinhood/new_pools?page=1",
+  (j) => {
+    const pools = j.data ?? [];
+    if (!pools.length) return "answered, but no new pools listed";
+    const newest = pools[0]?.attributes?.pool_created_at;
+    const age = newest ? Math.round((Date.now() - Date.parse(newest)) / 60000) : "?";
+    return `${pools.length} pools · newest ${age}m old`;
+  },
 );
 
 console.log("\nPRICING — what is it worth\n");
