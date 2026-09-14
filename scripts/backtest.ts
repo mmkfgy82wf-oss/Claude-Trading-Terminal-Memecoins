@@ -4,6 +4,7 @@
  *   npm run backtest                       — the bench, baseline only
  *   npm run backtest -- --tape run.jsonl   — a recording from a live run
  *   npm run backtest -- --compare          — baseline against the variants below
+ *   npm run backtest -- --tape run.jsonl --rugs   — does the pool predict the rug?
  *
  * A tape is produced by running the terminal with MARKET_RECORD set:
  *
@@ -11,6 +12,7 @@
  */
 import { inspectTape, tapeSource, type SnapshotSource } from "@/lib/backtest/source";
 import { scenarioSource } from "@/lib/backtest/scenarios";
+import { formatRugStudy, studyRugs } from "@/lib/backtest/rugs";
 import { replay, type ReplayResult } from "@/lib/backtest/replay";
 import { formatComparison, formatReport, poolResults } from "@/lib/backtest/report";
 import type { RiskConfig } from "@/lib/types";
@@ -88,6 +90,19 @@ async function main(): Promise<void> {
   } else {
     console.log("No --tape given, running the scenario bench.\n");
     source = scenarioSource({ seed, frames: Number(args.get("frames") ?? 240) });
+  }
+
+  // The rug study is an analysis of the data, not a run of the desk, so it
+  // short-circuits everything below it.
+  if (args.has("rugs")) {
+    if (!tape) {
+      console.error("--rugs needs a real tape: the bench places its rugs arbitrarily, so studying them would only measure my own assumption.");
+      process.exitCode = 1;
+      return;
+    }
+    const minutes = Number(args.get("window") ?? 6);
+    console.log(`\n${formatRugStudy(await studyRugs(source, minutes * 60_000))}`);
+    return;
   }
 
   let variants = args.has("compare") ? VARIANTS : [VARIANTS[0]];

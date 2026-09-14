@@ -53,7 +53,21 @@ sie ist abgeleitet, und der Replay baut sie exakt so wieder auf wie der
 Live-Feed. Ein abgeschnittener letzter Satz (Prozess getötet) kostet genau
 diese eine Zeile.
 
-Grob 8 Stunden Aufzeichnung bei 240 verfolgten Paaren ≈ 60–80 MB.
+Größe, nachgerechnet statt geschätzt (ein Token belegt 619 Bytes):
+
+| verfolgte Paare | alle 15 s | alle 30 s | alle 60 s |
+|---|---|---|---|
+| 120 | 18 MB/h | 9 MB/h | 4 MB/h |
+| 240 | 36 MB/h | 18 MB/h | 9 MB/h |
+
+**Empfohlen ist `MARKET_RECORD_SAMPLE_MS=30000`.** Der Trend-Test braucht
+mindestens 6 Messpunkte im 6-Minuten-Fenster; bei 30 s sind es 12, bei 60 s
+genau 6 — also zu knapp. 15 s bringt keine zusätzliche Information und
+verdoppelt nur die Datei. Ein Rug selbst ist ohnehin in keinem Takt zu
+erwischen: er ist eine einzige Transaktion.
+
+Das Tape wird angehängt. Ein Neustart mit anderer Taktrate verliert nichts;
+der Replay liest die Frames einfach in der Reihenfolge, in der sie stehen.
 
 Ausgeschaltet, solange `MARKET_RECORD` nicht gesetzt ist. Ein Schreibfehler
 schaltet den Rekorder ab und sonst nichts — das Desk handelt weiter.
@@ -65,6 +79,7 @@ npm run backtest                              # Bench, Basiskonfiguration
 npm run backtest -- --tape ./tapes/nacht.jsonl
 npm run backtest -- --compare --cohorts 24    # Varianten gegeneinander
 npm run backtest -- --sweep stopLossPct=10,15,25,40
+npm run backtest -- --tape ./tapes/nacht.jsonl --rugs   # sagt der Pool den Rug voraus?
 ```
 
 `--cohorts N` würfelt N unabhängige Bench-Kohorten und poolt die Trades.
@@ -170,7 +185,21 @@ Trades im kleinsten Lauf.
 Ein aufgezeichneter Lauf über eine Nacht. Damit lässt sich beantworten, was
 das Bench prinzipiell nicht kann:
 
-1. Sagt die Pool-Entwicklung vor dem Rug irgendetwas voraus?
+1. **Sagt die Pool-Entwicklung vor dem Rug irgendetwas voraus?**
+   Dafür gibt es jetzt `npm run backtest -- --tape … --rugs`. Es sucht die
+   Paare, die wirklich zusammengebrochen sind (≥70 % in zwei Frames), schaut
+   sich an, was ihr Pool in den Minuten davor tat, und vergleicht das mit
+   allen Paaren, die nicht zusammengebrochen sind.
+
+   Entscheidend ist nicht „leeren sich Pools vor einem Rug" — manche tun das
+   zufällig. Entscheidend ist das **Paar aus Trefferrate und Fehlalarmrate**:
+   eine Regel, die 90 % der Rugs fängt und dafür die Hälfte des Marktes
+   aussperrt, ist schlechter als gar keine Regel, und nur die zweite Zahl
+   sagt das. Die Ausgabe stellt beide nebeneinander.
+
+   Auf dem Prüfstand meldet das Werkzeug korrekt **kein** Signal — dort wird
+   der Pool bis zuletzt gefüllt, weil ich ihn so gebaut habe. Das ist der
+   Funktionsnachweis: es findet nichts, wo nichts ist.
 2. Sind Paare, die schon 10x gelaufen sind, häufiger Rugs — oder nicht?
 3. Welcher Agent trägt wirklich zum Ergebnis bei? Die Konsensgewichte
    (0.5 / 0.3 / 0.2) sind geschätzt und noch nie gemessen worden.
