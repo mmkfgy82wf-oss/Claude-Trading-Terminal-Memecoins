@@ -315,6 +315,23 @@ Konsolenfehler. Beides sauber.
 
 ---
 
+## 4b. Der Backtest
+
+Bis hierhin wurde die Handelslogik dreimal geändert und dabei **drei
+verschiedene Live-Läufe** verglichen — andere Token, andere Stunden. Jeder
+dieser Vergleiche war verunreinigt.
+
+Seit jetzt gibt es `npm run backtest`: dieselben Daten, zwei Regelsätze.
+Beide Datenquellen (ein aufgezeichnetes Tape aus einem echten Lauf, oder das
+synthetische Bench) laufen durch **dieselben** Agenten und dieselbe Pipeline
+wie das Live-Desk — `runDeskCycle` existiert genau deshalb an einer Stelle.
+
+Ergebnis der ersten Messrunde: von vier Verbesserungsideen hat **eine**
+bestanden (frühere erste Take-Profit-Stufe, −45 % Einbrüche unter −50 %).
+Zwei wurden nach der Messung zurückgenommen, eine bleibt als Notnetz mit
+nachgewiesenen Nullkosten. Details, Zahlen und Grenzen:
+**[docs/BACKTEST.md](docs/BACKTEST.md)**.
+
 ## 5. Bekannte Grenzen
 
 - **Chain-Abdeckung wird zur Laufzeit erkannt.** Antwortet eine Chain gerade

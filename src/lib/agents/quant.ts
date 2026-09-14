@@ -53,7 +53,7 @@ export class QuantAgent extends Agent {
 
     let hot = 0;
     for (const token of watchlist) {
-      const { score, confidence, reasons, label } = this.evaluate(token);
+      const { score, confidence, reasons, label } = this.evaluate(token, ctx);
       if (score >= 60) hot += 1;
       ctx.board.publish(this.signal(token.id, score, confidence, label, reasons));
     }
@@ -62,13 +62,24 @@ export class QuantAgent extends Agent {
     this.acted(hot ? `${hot} setup(s) above threshold` : "no setups above threshold", watchlist.length ? 1 : 0);
   }
 
-  private evaluate(token: Token): { score: number; confidence: number; reasons: string[]; label: string } {
+  private evaluate(
+    token: Token,
+    ctx: AgentContext,
+  ): { score: number; confidence: number; reasons: string[]; label: string } {
     const reasons: string[] = [];
     let score = 0;
 
     // 1. Multi-timeframe trend agreement — the 1h move sets the regime.
     const trend = token.change1h * 0.6 + token.change5m * 0.8 + token.change24h * 0.08;
     if (trend > 0) {
+      // Note: this curve saturates at a combined move of about +24%, so a pair
+      // up 50% in an hour and one up 1187% score identically here. That looks
+      // like destroyed information, and replacing it with a logarithmic curve
+      // was the obvious fix — but on the bench it cost a quarter of all
+      // entries and a fifth of the profit factor while removing not one
+      // blow-up (docs/BACKTEST.md). How far a pair has already run turns out
+      // to carry no usable information about whether its pool is about to be
+      // pulled, so the saturation stays until a recorded tape says otherwise.
       score += Math.min(34, Math.sqrt(trend) * 7);
       reasons.push(`trend +${token.change1h.toFixed(1)}% 1h / ${token.change5m >= 0 ? "+" : ""}${token.change5m.toFixed(1)}% 5m`);
     } else {
@@ -99,6 +110,18 @@ export class QuantAgent extends Agent {
     }
 
     // 4. Extension penalty — do not pay for a move that already happened.
+    //
+    // Scaled rather than switched: at twice the threshold it costs ~18 points,
+    // at eight times ~38. A pair that has done 10x in an hour is not a stronger
+    // version of one that has done 50% — it is a later entry into the same
+    // move, and late is where the desk was standing on most of its losses.
+    const run = Math.max(token.change1h, token.change5m * 4);
+    if (run > ctx.risk.maxEntryRunPct) {
+      const over = run / Math.max(1, ctx.risk.maxEntryRunPct);
+      score -= Math.min(45, 8 + 10 * Math.log2(over));
+      reasons.push(`+${run.toFixed(0)}% already run — late entry`);
+    }
+
     if (token.change5m > 45) {
       score -= Math.min(35, (token.change5m - 45) * 0.7);
       reasons.push(`extended +${token.change5m.toFixed(0)}% in 5m`);

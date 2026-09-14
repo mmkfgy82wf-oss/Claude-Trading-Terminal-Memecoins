@@ -1,3 +1,4 @@
+import { now } from "@/lib/util/clock";
 import type { AgentId, ConsensusView, Signal, Token } from "@/lib/types";
 import { CONSENSUS_WEIGHTS } from "./roster";
 
@@ -103,7 +104,7 @@ export class Blackboard {
                 ? "watch"
                 : "avoid",
         signals: signals.sort((a, b) => a.agent.localeCompare(b.agent)),
-        updatedAt: Date.now(),
+        updatedAt: now(),
       });
     }
     return out.sort((a, b) => b.score - a.score);

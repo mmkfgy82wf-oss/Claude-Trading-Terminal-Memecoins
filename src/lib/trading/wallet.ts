@@ -1,3 +1,4 @@
+import { now } from "@/lib/util/clock";
 import { CHAINS } from "@/lib/market/chains";
 import type { BookState } from "./persistence";
 import type {
@@ -75,7 +76,7 @@ export class PaperWallet {
   private readonly initialCash = new Map<ChainId, number>();
   /** Equity over benchmark at the anchor — a ratio, so prices cancel out. */
   private dayAnchorRatio = 1;
-  private dayAnchorAt = Date.now();
+  private dayAnchorAt = now();
 
   constructor(
     private startingEquityUsd: number,
@@ -83,7 +84,7 @@ export class PaperWallet {
     private prices: QuotePrices,
   ) {
     this.fund(startingEquityUsd, prices);
-    this.equityCurve.push({ t: Date.now(), p: 100 });
+    this.equityCurve.push({ t: now(), p: 100 });
   }
 
   /** Split the book evenly across the active chains, held natively. */
@@ -97,7 +98,7 @@ export class PaperWallet {
       this.initialCash.set(chain, native);
     }
     this.dayAnchorRatio = 1;
-    this.dayAnchorAt = Date.now();
+    this.dayAnchorAt = now();
   }
 
   /**
@@ -113,7 +114,7 @@ export class PaperWallet {
     this.prices = prices;
     this.fund(this.startingEquityUsd, prices);
     this.equityCurve.length = 0;
-    this.equityCurve.push({ t: Date.now(), p: 100 });
+    this.equityCurve.push({ t: now(), p: 100 });
     return true;
   }
 
@@ -185,7 +186,7 @@ export class PaperWallet {
     }
 
     const position: Position = {
-      id: `p${Date.now().toString(36)}${(++posSeq).toString(36)}`,
+      id: `p${now().toString(36)}${(++posSeq).toString(36)}`,
       tokenId: fill.tokenId,
       symbol: fill.symbol,
       chain: fill.chain,
@@ -252,7 +253,7 @@ export class PaperWallet {
       return;
     }
     this.openTrades.set(fill.tokenId, {
-      id: `t${Date.now().toString(36)}${(++tradeSeq).toString(36)}`,
+      id: `t${now().toString(36)}${(++tradeSeq).toString(36)}`,
       tokenId: fill.tokenId,
       symbol: fill.symbol,
       chain: fill.chain,
@@ -294,7 +295,7 @@ export class PaperWallet {
 
     const pnlNative = trade.proceedsNative - trade.costNative;
     const pnlUsd = pnlNative * this.quotePrice(trade.chain);
-    const closedAt = Date.now();
+    const closedAt = now();
 
     if (pnlNative >= 0) this.wins += 1;
     else this.losses += 1;
@@ -394,8 +395,8 @@ export class PaperWallet {
    * silently.
    */
   dailyDrawdownPct(): number {
-    if (Date.now() - this.dayAnchorAt > DAY_MS) {
-      this.dayAnchorAt = Date.now();
+    if (now() - this.dayAnchorAt > DAY_MS) {
+      this.dayAnchorAt = now();
       this.dayAnchorRatio = this.performance();
     }
     // Measured on the ratio, so a slide in SOL or ETH cannot halt the desk for
@@ -416,7 +417,7 @@ export class PaperWallet {
    * where the desk actually stands rather than wiping the run.
    */
   rearmDailyLimit(): void {
-    this.dayAnchorAt = Date.now();
+    this.dayAnchorAt = now();
     this.dayAnchorRatio = this.performance();
   }
 
@@ -452,7 +453,7 @@ export class PaperWallet {
     const index = benchmarkUsd > 0 ? (equityUsd / benchmarkUsd) * 100 : 100;
     const last = this.equityCurve[this.equityCurve.length - 1];
     if (!last || Math.abs(last.p - index) > 1e-9) {
-      this.equityCurve.push({ t: Date.now(), p: index });
+      this.equityCurve.push({ t: now(), p: index });
       if (this.equityCurve.length > 240) this.equityCurve.shift();
     }
 
@@ -566,6 +567,6 @@ export class PaperWallet {
     this.bestTradeUsd = 0;
     this.worstTradeUsd = 0;
     this.equityCurve.length = 0;
-    this.equityCurve.push({ t: Date.now(), p: 100 });
+    this.equityCurve.push({ t: now(), p: 100 });
   }
 }

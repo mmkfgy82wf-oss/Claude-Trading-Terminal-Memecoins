@@ -1,3 +1,4 @@
+import { now } from "@/lib/util/clock";
 import type {
   AgentDescriptor,
   AgentId,
@@ -52,14 +53,14 @@ export abstract class Agent {
     this.status = "thinking";
     this.activity = activity;
     this.load = load;
-    this.lastActiveAt = Date.now();
+    this.lastActiveAt = now();
   }
 
   protected acted(activity: string, count = 1): void {
     this.status = "acting";
     this.activity = activity;
     this.decisions += count;
-    this.lastActiveAt = Date.now();
+    this.lastActiveAt = now();
     this.load = Math.min(1, this.load + 0.2);
   }
 
@@ -72,7 +73,7 @@ export abstract class Agent {
   protected blocked(activity: string): void {
     this.status = "blocked";
     this.activity = activity;
-    this.lastActiveAt = Date.now();
+    this.lastActiveAt = now();
   }
 
   protected signal(
@@ -91,7 +92,7 @@ export abstract class Agent {
       label,
       reasons,
       veto,
-      createdAt: Date.now(),
+      createdAt: now(),
     };
   }
 }

@@ -1,3 +1,4 @@
+import { now } from "@/lib/util/clock";
 import type { Token } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
 
@@ -71,7 +72,7 @@ export class NarratorAgent extends Agent {
         .filter((t): t is Token => Boolean(t))
         .filter((t) => {
           const cached = this.claudeCache.get(t.id);
-          return !cached || Date.now() - cached.at > 10 * 60_000;
+          return !cached || now() - cached.at > 10 * 60_000;
         });
       for (const token of top) void this.askClaude(token, ctx);
     }
@@ -179,7 +180,7 @@ export class NarratorAgent extends Agent {
       if (!Number.isFinite(score)) throw new Error("no score");
 
       this.claudeCache.set(token.id, {
-        at: Date.now(),
+        at: now(),
         read: {
           score: Math.max(-100, Math.min(100, score)),
           thesis: String(parsed.thesis ?? "").slice(0, 90) || "no thesis returned",

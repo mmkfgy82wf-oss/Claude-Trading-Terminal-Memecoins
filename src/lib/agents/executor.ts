@@ -1,3 +1,4 @@
+import { liquidityTrend } from "@/lib/market/liquidity";
 import { PaperExecutor, type TradeExecutor } from "@/lib/trading/executor";
 import type { Position, Token, TradeIntent } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
@@ -112,6 +113,21 @@ export class ExecutorAgent extends Agent {
         return {
           fraction: 1,
           reason: `pool drained ${drainedPct.toFixed(0)}% from $${Math.round(position.peakLiquidityUsd).toLocaleString("en-US")}`,
+          rung: false,
+        };
+      }
+    }
+
+    // The pool emptying under a position that is still green. SENTINEL sees
+    // this too, but only for tokens on the watchlist, and a position the desk
+    // already holds often is not on it — so the check lives here as well
+    // rather than depending on the candidate list to contain what we own.
+    if (token && ctx.risk.liquidityTrendExitPct > 0) {
+      const trend = liquidityTrend(token.history);
+      if (trend?.distributing && trend.liquidityChangePct <= -ctx.risk.liquidityTrendExitPct) {
+        return {
+          fraction: 1,
+          reason: `pool -${(-trend.liquidityChangePct).toFixed(0)}% in ${Math.max(1, Math.round(trend.spanMs / 60_000))}m while price held`,
           rung: false,
         };
       }

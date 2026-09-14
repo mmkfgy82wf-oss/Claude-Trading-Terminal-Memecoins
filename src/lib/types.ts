@@ -80,6 +80,16 @@ export interface Token {
 export interface PricePoint {
   t: number;
   p: number;
+  /**
+   * Pool depth at that moment, in USD.
+   *
+   * Recorded alongside the price because the single most useful rug signal is
+   * not any one snapshot but the difference between two: a pool that empties
+   * while the chart climbs is being distributed into, and the desk lost real
+   * money to that shape while showing a green position the whole way down.
+   * Optional so a restored or hand-built history is still valid.
+   */
+  l?: number;
 }
 
 /** Per-agent verdict on a token, published to the blackboard each tick. */
@@ -330,6 +340,18 @@ export interface RiskConfig {
   minLiquidityUsd: number;
   minVolume24hUsd: number;
   maxPairAgeMinutes: number;
+  /**
+   * How far a pair may already have run in an hour and still be entered.
+   * Past it the desk is paying for a move that has happened; the penalty
+   * scales rather than switching off, so a strong trend is not banned outright.
+   */
+  maxEntryRunPct: number;
+  /**
+   * How far the pool may empty under a held position, in percent over the
+   * trend window, before the desk gets out — and how hard SENTINEL scores the
+   * same shape on a candidate. 0 switches both off.
+   */
+  liquidityTrendExitPct: number;
   minConsensusScore: number;
   dailyLossLimitPct: number;
 }

@@ -1,3 +1,5 @@
+import { now } from "@/lib/util/clock";
+import { random } from "@/lib/util/random";
 import { CHAINS } from "@/lib/market/chains";
 import type { ChainId, Fill, Position, RiskConfig, Token, TradeIntent } from "@/lib/types";
 
@@ -32,7 +34,7 @@ export interface TradeExecutor {
 }
 
 let fillSeq = 0;
-const fillId = () => `f${Date.now().toString(36)}${(++fillSeq).toString(36)}`;
+const fillId = () => `f${now().toString(36)}${(++fillSeq).toString(36)}`;
 
 /**
  * Slippage model: memecoin fills degrade with the size of the order relative to
@@ -43,7 +45,7 @@ export function estimateSlippagePct(orderUsd: number, liquidityUsd: number): num
   if (liquidityUsd <= 0) return 100;
   const share = orderUsd / liquidityUsd;
   const impact = share * 100 * 1.6 + share * share * 900;
-  const jitter = Math.random() * 0.4;
+  const jitter = random() * 0.4;
   return Math.min(99, 0.35 + impact + jitter);
 }
 
@@ -88,7 +90,7 @@ export class PaperExecutor implements TradeExecutor {
         quote: CHAINS[token.chain].native,
         slippagePct,
         reason: intent.reason,
-        at: Date.now(),
+        at: now(),
         txRef: `paper-${fillId()}`,
         mode: "paper",
       },
@@ -135,7 +137,7 @@ export class PaperExecutor implements TradeExecutor {
         realizedPnlNative,
         realizedPnlUsd: realizedPnlNative * quotePriceUsd,
         reason,
-        at: Date.now(),
+        at: now(),
         txRef: `paper-${fillId()}`,
         mode: "paper",
       },

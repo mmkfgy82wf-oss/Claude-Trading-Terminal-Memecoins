@@ -85,11 +85,11 @@ async function run(path: { price: number; liquidity?: number }[]): Promise<{ exi
   return { exits: wallet.recentFills().filter((f) => f.side === "sell"), wallet };
 }
 
-test("a winner that rolls over is now let go while it is still up", async () => {
+test("a winner that rolls over is let go while it is still up", async () => {
   const entry = 0.00005901;
-  // Peaks at +45% — short of the first take-profit rung, so the trailing stop
-  // never armed and the old desk rode it to −25%.
-  const { exits } = await run([
+  // Peaks at +45%. With the first rung at +25% that is above the ladder, so
+  // the wide trailing stop is the rule in charge of the remainder.
+  const { exits, wallet } = await run([
     { price: entry * 1.2 },
     { price: entry * 1.45 },
     { price: entry * 1.1 },
@@ -98,13 +98,45 @@ test("a winner that rolls over is now let go while it is still up", async () => 
     { price: entry * 0.8 },
   ]);
 
-  assert.equal(exits.length, 1, "the position closed");
-  const pnlPct = ((exits[0].priceUsd - entry) / entry) * 100;
-  // The old fixed breakeven line only fired once the trade was back at entry,
-  // which on live data meant exits at -12% and -19.7%. Trailing from the peak
-  // gets out while the position is still in profit.
-  assert.ok(pnlPct > 0, `expected an exit still in profit, got ${pnlPct.toFixed(1)}%`);
+  // recentFills() is newest-first, so read it the other way round to talk
+  // about the order the desk actually acted in.
+  const chronological = [...exits].reverse();
+  assert.equal(exits.length, 2, "one rung, then the trail");
+  assert.match(chronological[0].reason, /take-profit/, `expected a rung first: ${chronological[0].reason}`);
+
+  const last = chronological[chronological.length - 1];
+  assert.match(last.reason, /trailing stop|breakeven floor/, `wrong rule fired: ${last.reason}`);
+
+  // The round trip, not the last leg.
+  //
+  // A trailing stop of X% can only ever exit above entry once the peak has
+  // cleared X/(1-X) — 43% for the 30% trail in force above the first rung —
+  // and this path peaks at 45% and then gaps straight through breakeven. So
+  // the final leg closing slightly red is arithmetic, not a broken rule. What
+  // must hold is what the early rung exists for: the trade as a whole stays a
+  // winner, because 40% of it was already banked at +25%.
+  const [trade] = wallet.closedTrades();
+  assert.ok(trade, "the position closed out");
+  assert.ok(trade.pnlPct > 0, `expected a winning round trip, got ${trade.pnlPct.toFixed(1)}%`);
+  assert.equal(trade.outcome, "win");
+});
+
+test("a winner that stalls below the first rung still trails out in profit", async () => {
+  const entry = 0.00005901;
+  // Peaks at +22%, under the +25% rung, so the ladder never runs and the early
+  // trail is the only thing standing between this and a full round trip.
+  const { exits } = await run([
+    { price: entry * 1.12 },
+    { price: entry * 1.22 },
+    { price: entry * 1.05 },
+    { price: entry * 0.98 },
+    { price: entry * 0.9 },
+  ]);
+
+  assert.equal(exits.length, 1, "the position closed once");
   assert.match(exits[0].reason, /early trail/, `wrong rule fired: ${exits[0].reason}`);
+  const pnlPct = ((exits[0].priceUsd - entry) / entry) * 100;
+  assert.ok(pnlPct > 0, `expected an exit still in profit, got ${pnlPct.toFixed(1)}%`);
 });
 
 test("a position that never worked still exits on the ordinary stop-loss", async () => {

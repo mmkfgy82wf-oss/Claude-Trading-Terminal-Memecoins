@@ -211,7 +211,10 @@ export class ChainFeed {
   /** Keep the rolling history across refreshes so charts stay continuous. */
   private merge(next: Token): void {
     const prev = this.tokens.get(next.id);
-    const history = [...(prev?.history ?? []), { t: Date.now(), p: next.priceUsd }].slice(-120);
+    const history = [
+      ...(prev?.history ?? []),
+      { t: Date.now(), p: next.priceUsd, l: next.liquidityUsd },
+    ].slice(-120);
     this.tokens.set(next.id, { ...next, history });
     this.lastSeen.set(next.id, Date.now());
   }

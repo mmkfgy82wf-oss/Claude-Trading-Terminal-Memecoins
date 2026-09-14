@@ -1,3 +1,5 @@
+import { now } from "@/lib/util/clock";
+import { liquidityTrend, MIN_TREND_SAMPLES } from "@/lib/market/liquidity";
 import { fetchHolderIntel, fetchMintIntel } from "@/lib/market/providers";
 import type { Token } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
@@ -96,6 +98,27 @@ export class SentinelAgent extends Agent {
       out.push({ points: 35, reason: `down ${token.change24h.toFixed(0)}% on a thin pool` });
     }
 
+    // The pool over time, not the pool right now. This is the only check here
+    // that could have seen the overnight losses coming: on every one of them
+    // the snapshot looked fine until the frame it did not.
+    const floor = ctx.risk.liquidityTrendExitPct;
+    const trend = floor > 0 ? liquidityTrend(token.history) : null;
+    if (trend && trend.samples >= MIN_TREND_SAMPLES) {
+      const drained = -trend.liquidityChangePct;
+      const minutes = Math.max(1, Math.round(trend.spanMs / 60_000));
+      if (trend.distributing && drained >= floor * 1.25) {
+        out.push({
+          points: 60,
+          reason: `pool -${drained.toFixed(0)}% in ${minutes}m while price ${trend.priceChangePct >= 0 ? "+" : ""}${trend.priceChangePct.toFixed(0)}% — being distributed into`,
+          fatal: true,
+        });
+      } else if (trend.distributing && drained >= floor * 0.6) {
+        out.push({ points: 38, reason: `pool -${drained.toFixed(0)}% in ${minutes}m on a rising price` });
+      } else if (drained >= floor * 1.75) {
+        out.push({ points: 25, reason: `pool -${drained.toFixed(0)}% in ${minutes}m` });
+      }
+    }
+
     if (token.ageMinutes < 8) {
       out.push({ points: 20, reason: `${token.ageMinutes}m since launch — no track record` });
     }
@@ -110,7 +133,7 @@ export class SentinelAgent extends Agent {
   /** Checks that need an API key. Silently skipped when none is configured. */
   private async providerChecks(token: Token): Promise<Finding[]> {
     const cached = this.intel.get(token.id);
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.findings;
+    if (cached && now() - cached.at < CACHE_TTL_MS) return cached.findings;
 
     const findings: Finding[] = [];
     const [holders, mint] = await Promise.all([fetchHolderIntel(token), fetchMintIntel(token)]);
@@ -127,7 +150,7 @@ export class SentinelAgent extends Agent {
       if (mint.freezeAuthorityActive) findings.push({ points: 55, reason: "freeze authority still active", fatal: true });
     }
 
-    this.intel.set(token.id, { at: Date.now(), findings });
+    this.intel.set(token.id, { at: now(), findings });
     return findings;
   }
 }

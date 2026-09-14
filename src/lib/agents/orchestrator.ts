@@ -1,4 +1,5 @@
 import { MarketFeed } from "@/lib/market/feed";
+import { recorderFromEnv, type TickRecorder } from "@/lib/market/recorder";
 import { fetchQuotePrices, providerFlags } from "@/lib/market/providers";
 import { PaperExecutor } from "@/lib/trading/executor";
 import { AGGRESSIVE, sanitizeRisk } from "@/lib/trading/risk";
@@ -23,6 +24,7 @@ import { ExecutorAgent } from "./executor";
 import { NarratorAgent } from "./narrator";
 import { QuantAgent } from "./quant";
 import { RiskAgent } from "./risk";
+import { runDeskCycle } from "./pipeline";
 import { ScoutAgent } from "./scout";
 import { SentinelAgent } from "./sentinel";
 
@@ -68,6 +70,8 @@ export class Orchestrator {
   private lastSnapshot: TerminalSnapshot | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private restored = false;
+  /** Writes the live feed to disk when MARKET_RECORD is set, for the backtest. */
+  private readonly recorder: TickRecorder | null = recorderFromEnv();
 
   constructor() {
     this.wallet = new PaperWallet(this.risk.startingCapitalUsd, this.chains, this.quotePrices);
@@ -126,6 +130,12 @@ export class Orchestrator {
         );
       }
     }
+    if (this.recorder) {
+      this.log(
+        "system",
+        `Recording the feed to ${process.env.MARKET_RECORD} — replayable by the backtest`,
+      );
+    }
     void this.loop();
   }
 
@@ -164,20 +174,25 @@ export class Orchestrator {
       // would quietly stop being evaluated.
       const held = new Set(this.wallet.openPositions().map((p) => p.tokenId));
       const tokens = await this.feed.poll(held);
+      this.recorder?.capture(this.tick, tokens, this.quotePrices);
       this.board.setUniverse(tokens);
       const byId = new Map<string, Token>(tokens.map((t) => [t.id, t]));
       this.wallet.markToMarket(byId);
 
-      // Pipeline order matters: discovery → safety → signal → story → sizing.
-      this.scout.run(this.context("scout"));
-      await this.sentinel.run(this.context("sentinel"));
-      this.quant.run(this.context("quant"));
-      await this.narrator.run(this.context("narrator"));
-      this.riskAgent.run(this.context("risk"));
-
-      const execCtx = this.context("executor");
-      await this.routeIntents(execCtx);
-      await this.executor.run(execCtx);
+      // Pipeline order lives in one place, shared with the backtest, so a
+      // replay always measures the sequence that actually trades.
+      await runDeskCycle(
+        {
+          scout: this.scout,
+          sentinel: this.sentinel,
+          quant: this.quant,
+          narrator: this.narrator,
+          risk: this.riskAgent,
+          executor: this.executor,
+        },
+        (agent) => this.context(agent),
+        (ctx) => this.routeIntents(ctx),
+      );
 
       this.expireApprovals();
       this.emit();

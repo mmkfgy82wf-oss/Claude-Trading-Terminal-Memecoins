@@ -1,10 +1,11 @@
+import { now } from "@/lib/util/clock";
 import { CHAINS } from "@/lib/market/chains";
 import { estimateSlippagePct } from "@/lib/trading/executor";
 import type { ChainId, TickDiagnostics, TradeIntent } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
 
 let intentSeq = 0;
-const intentId = () => `i${Date.now().toString(36)}${(++intentSeq).toString(36)}`;
+const intentId = () => `i${now().toString(36)}${(++intentSeq).toString(36)}`;
 
 /**
  * RISK — turns "we like it" into "we can actually take it, this big".
@@ -188,7 +189,7 @@ export class RiskAgent extends Agent {
         reason: `consensus ${candidate.score.toFixed(0)} · conf ${(candidate.confidence * 100).toFixed(0)}%`,
         consensusScore: candidate.score,
         confidence: candidate.confidence,
-        createdAt: Date.now(),
+        createdAt: now(),
       });
 
       headroomUsd.set(chain, chainHeadroomUsd - sizeNative * quotePriceUsd);

@@ -47,6 +47,7 @@ npm run typecheck  # TypeScript ohne Emit
 npm run phone         # LAN-URL + QR-Code fürs Handy
 npm run check-sources # prüft alle Datenquellen von deinem Netz aus
 npm run check-chains  # zeigt, welche Chains gerade live indiziert sind
+npm run backtest      # Regeln gegen ein Tape oder das Bench messen
 ```
 
 ## Woher die Token kommen
@@ -110,5 +111,6 @@ expliziter Opt-in-Flag gesetzt sind.
 | Datei | Inhalt |
 |---|---|
 | **[docs/BETRIEB.md](docs/BETRIEB.md)** | **Dauerbetrieb** — Docker, systemd, Persistenz, Erreichbarkeit |
+| **[docs/BACKTEST.md](docs/BACKTEST.md)** | **Regeln messen** — Tape aufzeichnen, Backtest laufen lassen, was gemessen wurde und was das Bench nicht kann |
 | **[docs/TERMINAL.md](docs/TERMINAL.md)** | **Die Oberfläche lesen** — was pro Tick passiert, jedes Panel, jede Zahl, jeder Marker, plus Symptom→Ursache-Tabelle |
 | [PROJEKT.md](PROJEKT.md) | Architektur, Agenten, Entscheidungen, Tests, bekannte Grenzen |
