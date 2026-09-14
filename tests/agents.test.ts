@@ -185,13 +185,13 @@ test("RISK halts new entries once the daily loss limit is breached", async () =>
   const lossNative = (BOOK_USD * 0.5) / SOL;
   wallet.applyBuy(
     { id: "a", tokenId: "solana:GOOD", symbol: "GOOD", chain: "solana", side: "buy", quantity: 1000,
-      priceUsd: 0.001, valueNative: lossNative, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
+      priceUsd: 0.001, liquidityUsd: 500_000, valueNative: lossNative, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
       reason: "t", at: Date.now(), txRef: "paper-a", mode: "paper" },
     AGGRESSIVE,
   );
   wallet.applySell(
     { id: "b", tokenId: "solana:GOOD", symbol: "GOOD", chain: "solana", side: "sell", quantity: 1000,
-      priceUsd: 0.0001, valueNative: 0.05, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
+      priceUsd: 0.0001, liquidityUsd: 500_000, valueNative: 0.05, feeNative: 0.01, quote: "SOL", slippagePct: 0.4,
       realizedPnlNative: -(lossNative - 0.05), realizedPnlUsd: -(lossNative - 0.05) * SOL,
       reason: "sl", at: Date.now(), txRef: "paper-b", mode: "paper" },
     false,

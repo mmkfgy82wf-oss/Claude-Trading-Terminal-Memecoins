@@ -40,6 +40,9 @@ export function PositionsPanel({
               const up = position.unrealizedPnlPct >= 0;
               const peakGain = ((position.peakPriceUsd - position.entryPriceUsd) / position.entryPriceUsd) * 100;
               const ladderArmed = peakGain >= (position.takeProfitLadder[0] ?? Infinity);
+              // Armed once the trade has clearly worked: from here it can no
+              // longer become a full loser.
+              const breakevenArmed = peakGain >= position.breakevenTriggerPct;
               // Distance from here to the stop, as a share of the full stop band.
               const stopProgress = Math.min(100, Math.max(0, (-position.unrealizedPnlPct / position.stopLossPct) * 100));
 
@@ -94,6 +97,20 @@ export function PositionsPanel({
                     </div>
                     <span className="text-[9px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
                       SL −{position.stopLossPct}%
+                    </span>
+                    <span
+                      className="rounded px-1 text-[8px] font-semibold uppercase tracking-wider"
+                      style={{
+                        color: breakevenArmed ? "var(--surface-0)" : "var(--text-muted)",
+                        background: breakevenArmed ? "var(--pos)" : "var(--surface-2)",
+                      }}
+                      title={
+                        breakevenArmed
+                          ? `Peaked +${peakGain.toFixed(0)}% — the stop now sits at +${position.breakevenBufferPct}%, so this can no longer become a full loser.`
+                          : `Arms once the position peaks at +${position.breakevenTriggerPct}%.`
+                      }
+                    >
+                      BE +{position.breakevenBufferPct}%
                     </span>
                     <span className="flex items-center gap-0.5" title="take-profit ladder">
                       {position.takeProfitLadder.map((rung, i) => (

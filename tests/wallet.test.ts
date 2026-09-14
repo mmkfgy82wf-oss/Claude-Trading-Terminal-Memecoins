@@ -198,7 +198,7 @@ test("the daily drawdown is measured against the session anchor", () => {
   // Book a loss by selling a position bought at a higher price.
   const fill: Fill = {
     id: "x", tokenId: "solana:TESTPAIR", symbol: "TEST", chain: "solana", side: "buy",
-    quantity: 1000, priceUsd: 0.001, valueNative: 4, feeNative: 0.01, quote: "SOL", slippagePct: 0.5,
+    quantity: 1000, priceUsd: 0.001, liquidityUsd: 500_000, valueNative: 4, feeNative: 0.01, quote: "SOL", slippagePct: 0.5,
     reason: "t", at: Date.now(), txRef: "paper-x", mode: "paper",
   };
   w.applyBuy(fill, AGGRESSIVE);
@@ -213,7 +213,7 @@ function breachDailyLimit(w: PaperWallet, fractionLost = 0.5): void {
   const size = (BOOK_USD * fractionLost) / SOL;
   const base: Fill = {
     id: "brk-buy", tokenId: "solana:BREACH", symbol: "BREACH", chain: "solana", side: "buy",
-    quantity: 1000, priceUsd: 0.001, valueNative: size, feeNative: 0.001, quote: "SOL",
+    quantity: 1000, priceUsd: 0.001, liquidityUsd: 500_000, valueNative: size, feeNative: 0.001, quote: "SOL",
     slippagePct: 0.5, reason: "t", at: Date.now(), txRef: "paper-a", mode: "paper",
   };
   w.applyBuy(base, AGGRESSIVE);
@@ -241,7 +241,7 @@ test("re-arming clears the halt and keeps the book intact", () => {
   // Open a position that should survive the re-arm.
   const entry: Fill = {
     id: "keep", tokenId: "solana:KEEP", symbol: "KEEP", chain: "solana", side: "buy",
-    quantity: 500, priceUsd: 0.002, valueNative: 1, feeNative: 0.001, quote: "SOL",
+    quantity: 500, priceUsd: 0.002, liquidityUsd: 500_000, valueNative: 1, feeNative: 0.001, quote: "SOL",
     slippagePct: 0.4, reason: "t", at: Date.now(), txRef: "paper-k", mode: "paper",
   };
   w.applyBuy(entry, AGGRESSIVE);
@@ -274,7 +274,7 @@ test("resetting the book starts the run over at the configured size", () => {
   breachDailyLimit(w);
   w.applyBuy(
     { id: "x", tokenId: "solana:X", symbol: "X", chain: "solana", side: "buy", quantity: 10,
-      priceUsd: 0.01, valueNative: 0.5, feeNative: 0.001, quote: "SOL", slippagePct: 0.4,
+      priceUsd: 0.01, liquidityUsd: 500_000, valueNative: 0.5, feeNative: 0.001, quote: "SOL", slippagePct: 0.4,
       reason: "t", at: Date.now(), txRef: "paper-x", mode: "paper" },
     AGGRESSIVE,
   );

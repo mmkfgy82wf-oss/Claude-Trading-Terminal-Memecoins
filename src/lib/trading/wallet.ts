@@ -178,6 +178,7 @@ export class PaperWallet {
           (existing.entryPriceUsd * existing.quantity + fill.priceUsd * fill.quantity) / quantity,
         currentPriceUsd: fill.priceUsd,
         peakPriceUsd: Math.max(existing.peakPriceUsd, fill.priceUsd),
+        peakLiquidityUsd: Math.max(existing.peakLiquidityUsd, fill.liquidityUsd),
       };
       this.positions.set(fill.tokenId, merged);
       return merged;
@@ -194,9 +195,13 @@ export class PaperWallet {
       quote: fill.quote,
       openedAt: fill.at,
       stopLossPct: risk.stopLossPct,
+      breakevenTriggerPct: risk.breakevenTriggerPct,
+      breakevenBufferPct: risk.breakevenBufferPct,
       takeProfitLadder: [...risk.takeProfitLadder],
       filledRungs: 0,
       peakPriceUsd: fill.priceUsd,
+      entryLiquidityUsd: fill.liquidityUsd,
+      peakLiquidityUsd: fill.liquidityUsd,
       trailingStopPct: risk.trailingStopPct,
       currentPriceUsd: fill.priceUsd,
       unrealizedPnlNative: 0,
@@ -326,6 +331,7 @@ export class PaperWallet {
     for (const [id, position] of this.positions) {
       const token = tokens.get(id);
       const price = token?.priceUsd ?? position.currentPriceUsd;
+      const liquidity = token?.liquidityUsd ?? 0;
       const quotePrice = this.quotePrice(position.chain);
       const valueNative = (position.quantity * price) / quotePrice;
       const pnlNative = valueNative - position.costNative;
@@ -333,6 +339,7 @@ export class PaperWallet {
         ...position,
         currentPriceUsd: price,
         peakPriceUsd: Math.max(position.peakPriceUsd, price),
+        peakLiquidityUsd: Math.max(position.peakLiquidityUsd, liquidity),
         unrealizedPnlNative: pnlNative,
         unrealizedPnlUsd: pnlNative * quotePrice,
         unrealizedPnlPct: ((price - position.entryPriceUsd) / position.entryPriceUsd) * 100,

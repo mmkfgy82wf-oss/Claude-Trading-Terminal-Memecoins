@@ -182,6 +182,7 @@ CHONKI  SOL  0.4873 SOL @ $0.000672      ▲ +85.1%   +0.4117 SOL  [CLOSE]
 | Einstieg | Einsatz und Einstiegspreis **im Quote-Asset der Chain** |
 | Roter Balken | Nähe zum Stop-Loss. Voll = Stop wird ausgelöst |
 | `SL −25%` | Stop-Loss-Schwelle |
+| `BE +2%` | **Breakeven-Stop.** Grün = scharf: Die Position hat ihren Auslöser überschritten und kann nicht mehr als voller Verlust enden. Grau = noch nicht erreicht |
 | `+50% +150% +400%` | Take-Profit-Stufen. **Grün hinterlegt = bereits gezogen** (verkauft 40 % / 35 % / Rest) |
 | `TRAIL IDLE` / `TRAIL −30%` | Trailing-Stop scharf erst **nach der ersten TP-Stufe** — sonst würde normales Rauschen jeden Einstieg ausstoppen |
 | `CLOSE` | Sofort vollständig verkaufen |
@@ -269,6 +270,8 @@ ausfällt.
 | Alles simuliert | **Statusleiste** | Der Grund steht im Klartext dort |
 | Minus-Prozent ohne Trades | **Portfolio** | Sollte nicht mehr vorkommen — der Vergleich läuft gegen die Startbestände. Tritt es auf, stimmt etwas nicht |
 | Terminal wirkt eingefroren | **Agenten-Desk**, Tick-Zähler | Zähler steht = Desk hängt. Zähler läuft = Anzeige hängt |
+| Gewinner schloss im Minus | **Positionszeile → `BE`** | War er grau, hat die Position den Breakeven-Auslöser nie erreicht. Auslöser im Risk-Panel senken |
+| Verlust weit jenseits des Stops | **Trade-Log → Grund** | „pool drained" = Liquidität weg, Rug. Ein Preis-Stop kann das nicht abfangen |
 | Position wird nicht verkauft | **Offene Positionen** | SL/TP/Trail-Zustand stehen in der Zeile |
 | Welche Trades liefen gut? | **Trade-Log → `TRADES`** | Ein Eintrag pro Round Trip, mit Ausgang und Grund |
 | Trade sieht falsch aus | **Trade-Log → `FILLS`** | Zeigt, aus welchen Teilverkäufen er bestand |

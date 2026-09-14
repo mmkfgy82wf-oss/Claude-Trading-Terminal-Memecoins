@@ -101,14 +101,42 @@ export class ExecutorAgent extends Agent {
     }
 
     const pnlPct = position.unrealizedPnlPct;
+    const token = ctx.board.token(position.tokenId);
+
+    // Checked before the stop-loss, because it is the earlier warning. On most
+    // rugs liquidity leaves with the price or just ahead of it, and by the time
+    // a price stop fires the pool is gone and the exit clears at any price.
+    if (token && position.peakLiquidityUsd > 0) {
+      const drainedPct = ((position.peakLiquidityUsd - token.liquidityUsd) / position.peakLiquidityUsd) * 100;
+      if (drainedPct >= ctx.risk.liquidityDropExitPct) {
+        return {
+          fraction: 1,
+          reason: `pool drained ${drainedPct.toFixed(0)}% from $${Math.round(position.peakLiquidityUsd).toLocaleString("en-US")}`,
+          rung: false,
+        };
+      }
+    }
 
     if (pnlPct <= -position.stopLossPct) {
       return { fraction: 1, reason: `stop-loss ${pnlPct.toFixed(1)}%`, rung: false };
     }
 
-    // Trailing stop only arms once the position has cleared the first rung —
-    // otherwise normal memecoin noise would shake every entry out immediately.
     const peakGainPct = ((position.peakPriceUsd - position.entryPriceUsd) / position.entryPriceUsd) * 100;
+
+    // Once a position has clearly worked, it must not be able to become a full
+    // loser. The trailing stop below only arms at the first take-profit rung,
+    // so without this a trade could peak at +45%, get no protection at all, and
+    // ride the whole way down to the hard stop.
+    if (peakGainPct >= position.breakevenTriggerPct && pnlPct <= position.breakevenBufferPct) {
+      return {
+        fraction: 1,
+        reason: `breakeven stop at ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}% (peaked +${peakGainPct.toFixed(0)}%)`,
+        rung: false,
+      };
+    }
+
+    // Trailing stop takes over above the first rung, where a wider leash is
+    // right — normal memecoin noise would shake a tight one out immediately.
     const firstRung = position.takeProfitLadder[0] ?? 50;
     if (peakGainPct >= firstRung) {
       const dropFromPeak = ((position.peakPriceUsd - position.currentPriceUsd) / position.peakPriceUsd) * 100;
@@ -127,8 +155,8 @@ export class ExecutorAgent extends Agent {
       return { fraction, reason: `take-profit +${nextRung}% (rung ${position.filledRungs + 1})`, rung: true };
     }
 
-    // A position whose pool has drained is worth exiting even at a loss.
-    const token = ctx.board.token(position.tokenId);
+    // Absolute floor, for a pool that was already shallow at entry and so
+    // never triggers the relative drain check above.
     if (token && token.liquidityUsd < ctx.risk.minLiquidityUsd * 0.35) {
       return { fraction: 1, reason: "liquidity drained below exit threshold", rung: false };
     }

@@ -187,11 +187,19 @@ export interface Position {
   quote: string;
   openedAt: number;
   stopLossPct: number;
+  /** Peak gain at which the stop moves up to entry. */
+  breakevenTriggerPct: number;
+  /** Where that stop sits, above entry, to cover round-trip costs. */
+  breakevenBufferPct: number;
   takeProfitLadder: number[];
   /** Ladder rungs already taken. */
   filledRungs: number;
   /** Highest price seen since entry — drives the trailing stop. */
   peakPriceUsd: number;
+  /** Pool depth when the position was opened. */
+  entryLiquidityUsd: number;
+  /** Deepest the pool has been while held — a drain is measured from here. */
+  peakLiquidityUsd: number;
   trailingStopPct: number;
   currentPriceUsd: number;
   unrealizedPnlNative: number;
@@ -207,6 +215,8 @@ export interface Fill {
   side: TradeSide;
   quantity: number;
   priceUsd: number;
+  /** Pool depth at the moment of the fill — the reference a drain is measured against. */
+  liquidityUsd: number;
   /** Value and fee in the chain's quote asset. */
   valueNative: number;
   feeNative: number;
@@ -283,8 +293,25 @@ export interface RiskConfig {
   maxOpenPositions: number;
   maxPortfolioExposurePct: number;
   stopLossPct: number;
+  /**
+   * Peak gain at which the stop moves up to the entry price.
+   *
+   * Without it a position could peak at +45%, get no protection at all because
+   * the trailing stop only arms at the first take-profit rung, and ride the
+   * whole way down to the hard stop. A trade that was clearly working should
+   * not be able to become a full loser.
+   */
+  breakevenTriggerPct: number;
+  /** Where the breakeven stop actually sits, above entry, to cover round-trip costs. */
+  breakevenBufferPct: number;
   takeProfitLadder: number[];
   trailingStopPct: number;
+  /**
+   * Exit when the pool has drained this far below its deepest level while held.
+   * On most rugs liquidity leaves with the price or just before it, and an
+   * absolute floor reacts far too late for a pool that started deep.
+   */
+  liquidityDropExitPct: number;
   maxSlippagePct: number;
   minLiquidityUsd: number;
   minVolume24hUsd: number;

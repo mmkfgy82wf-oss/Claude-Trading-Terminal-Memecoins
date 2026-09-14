@@ -19,6 +19,7 @@ const leg = (over: Partial<Fill> = {}): Fill => ({
   side: "buy",
   quantity: 1000,
   priceUsd: 0.001,
+  liquidityUsd: 500_000,
   valueNative: 1,
   feeNative: 0.003,
   quote: "SOL",
