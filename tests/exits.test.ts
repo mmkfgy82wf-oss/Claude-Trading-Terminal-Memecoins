@@ -85,7 +85,7 @@ async function run(path: { price: number; liquidity?: number }[]): Promise<{ exi
   return { exits: wallet.recentFills().filter((f) => f.side === "sell"), wallet };
 }
 
-test("a winner that gives it all back now closes near breakeven, not at the stop", async () => {
+test("a winner that rolls over is now let go while it is still up", async () => {
   const entry = 0.00005901;
   // Peaks at +45% — short of the first take-profit rung, so the trailing stop
   // never armed and the old desk rode it to −25%.
@@ -100,8 +100,11 @@ test("a winner that gives it all back now closes near breakeven, not at the stop
 
   assert.equal(exits.length, 1, "the position closed");
   const pnlPct = ((exits[0].priceUsd - entry) / entry) * 100;
-  assert.ok(pnlPct > -12, `expected an exit near entry, got ${pnlPct.toFixed(1)}%`);
-  assert.match(exits[0].reason, /breakeven/, `wrong rule fired: ${exits[0].reason}`);
+  // The old fixed breakeven line only fired once the trade was back at entry,
+  // which on live data meant exits at -12% and -19.7%. Trailing from the peak
+  // gets out while the position is still in profit.
+  assert.ok(pnlPct > 0, `expected an exit still in profit, got ${pnlPct.toFixed(1)}%`);
+  assert.match(exits[0].reason, /early trail/, `wrong rule fired: ${exits[0].reason}`);
 });
 
 test("a position that never worked still exits on the ordinary stop-loss", async () => {
@@ -165,4 +168,20 @@ test("the take-profit ladder still runs above the breakeven trigger", async () =
   assert.equal(exits.length, 1, "the first rung fired");
   assert.match(exits[0].reason, /take-profit/, `wrong rule fired: ${exits[0].reason}`);
   assert.ok(wallet.positionFor("solana:P"), "a rung is partial — the rest stays open");
+});
+
+test("the log records how far up a trade was and what happened to the pool", async () => {
+  const entry = 0.00005901;
+  const { wallet } = await run([
+    { price: entry * 1.4, liquidity: 160_000 },
+    { price: entry * 1.05, liquidity: 60_000 },
+  ]);
+
+  const [trade] = wallet.closedTrades();
+  assert.ok(trade, "the position closed");
+  // Without these a screenshot cannot say whether a bad exit was a price gap
+  // or a pool that vanished — the two need opposite fixes.
+  assert.ok(trade.peakGainPct > 35, `peak not recorded: ${trade.peakGainPct}`);
+  assert.equal(trade.peakLiquidityUsd, 160_000);
+  assert.ok(trade.exitLiquidityUsd < trade.peakLiquidityUsd, "the drain is visible in the log");
 });

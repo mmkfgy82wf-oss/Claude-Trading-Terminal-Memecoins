@@ -105,9 +105,11 @@ einzige Einheit ist, die auf beiden Chains dasselbe bedeutet.
 - max. 70 % Gesamtexposure, **pro Chain gegen deren eigene Kasse geprüft**
 - Stop-Loss −25 %
 - Take-Profit-Leiter +50 % / +150 % / +400 % (verkauft 40 % / 35 % / Rest)
-- **Breakeven-Stop:** Ab +20 % Höchststand rückt der Stop auf Einstieg +2 %. Eine
-  Position, die erkennbar funktioniert hat, kann danach nicht mehr als voller
-  Verlust enden
+- **Früher Trailing-Stop:** Ab +20 % Höchststand wird 18 % unter dem Höchststand
+  nachgezogen, mit hartem Boden bei Einstieg +2 %. Eine feste Breakeven-Linie
+  wird erst überschritten, wenn der Trade schon zurück am Einstieg ist — auf
+  Live-Daten hieß das Ausstiege bei −12 % und −19,7 %. Vom Höchststand gemessen
+  greift die Regel, solange die Position noch im Plus ist
 - **Pool-Drain-Ausstieg:** Fällt die Liquidität 40 % unter ihren Höchststand,
   wird sofort verkauft — vor dem Preis-Stop, weil Liquidität bei Rugs zuerst geht
 - Trailing-Stop −30 %, **scharf erst nach der ersten TP-Stufe** — sonst würde
@@ -240,7 +242,7 @@ Agenten: jeder hat neben seiner Farbe ein Glyph und sein Call-Sign.
 
 ## 4. Was geprüft wurde
 
-### Unit-Tests — 68, alle grün (`npm test`)
+### Unit-Tests — 69, alle grün (`npm test`)
 - Slippage wächst mit dem Order-zu-Pool-Verhältnis; leerer Pool ist unfüllbar
 - Ein Kauf belastet Cash und legt den Ausstiegsplan an der Position ab
 - Ein profitabler Round-Trip bucht realisierten Gewinn und zählt als Win
@@ -354,5 +356,5 @@ src/lib/trading/executor.ts      TradeExecutor-Interface, Paper + Live-Naht
 src/lib/trading/wallet.ts        Paper-Buch: eine Treasury je Chain, Aggregate in USD
 src/app/api/{stream,control,state}/route.ts
 src/components/*.tsx             Terminal-Oberfläche
-tests/*.test.ts                  68 Unit-Tests
+tests/*.test.ts                  69 Unit-Tests
 ```

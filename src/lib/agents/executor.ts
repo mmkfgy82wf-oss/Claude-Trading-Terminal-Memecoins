@@ -123,27 +123,34 @@ export class ExecutorAgent extends Agent {
 
     const peakGainPct = ((position.peakPriceUsd - position.entryPriceUsd) / position.entryPriceUsd) * 100;
 
-    // Once a position has clearly worked, it must not be able to become a full
-    // loser. The trailing stop below only arms at the first take-profit rung,
-    // so without this a trade could peak at +45%, get no protection at all, and
-    // ride the whole way down to the hard stop.
-    if (peakGainPct >= position.breakevenTriggerPct && pnlPct <= position.breakevenBufferPct) {
-      return {
-        fraction: 1,
-        reason: `breakeven stop at ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}% (peaked +${peakGainPct.toFixed(0)}%)`,
-        rung: false,
-      };
-    }
-
-    // Trailing stop takes over above the first rung, where a wider leash is
-    // right — normal memecoin noise would shake a tight one out immediately.
+    const dropFromPeak = ((position.peakPriceUsd - position.currentPriceUsd) / position.peakPriceUsd) * 100;
     const firstRung = position.takeProfitLadder[0] ?? 50;
-    if (peakGainPct >= firstRung) {
-      const dropFromPeak = ((position.peakPriceUsd - position.currentPriceUsd) / position.peakPriceUsd) * 100;
-      if (dropFromPeak >= position.trailingStopPct) {
+
+    // Once a position has clearly worked it must not be able to become a full
+    // loser — but a fixed breakeven line is only crossed when the trade is
+    // already back at entry, and the tick that notices is further down still.
+    // Trailing from the peak engages while it is up: a +35% peak with an 18%
+    // trail exits near +11%, not at −12%.
+    if (peakGainPct >= position.breakevenTriggerPct && peakGainPct < firstRung) {
+      if (dropFromPeak >= position.earlyTrailPct || pnlPct <= position.breakevenBufferPct) {
         return {
           fraction: 1,
-          reason: `trailing stop -${dropFromPeak.toFixed(1)}% from peak (+${peakGainPct.toFixed(0)}%)`,
+          reason: `early trail -${dropFromPeak.toFixed(1)}% from peak (+${peakGainPct.toFixed(0)}%)`,
+          rung: false,
+        };
+      }
+    }
+
+    // Above the first rung a wider leash is right — normal memecoin noise would
+    // shake a tight one out of exactly the runner that pays for the losers.
+    if (peakGainPct >= firstRung) {
+      if (dropFromPeak >= position.trailingStopPct || pnlPct <= position.breakevenBufferPct) {
+        return {
+          fraction: 1,
+          reason:
+            pnlPct <= position.breakevenBufferPct
+              ? `breakeven floor at ${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(1)}% (peaked +${peakGainPct.toFixed(0)}%)`
+              : `trailing stop -${dropFromPeak.toFixed(1)}% from peak (+${peakGainPct.toFixed(0)}%)`,
           rung: false,
         };
       }

@@ -13,6 +13,7 @@ export const AGGRESSIVE: RiskConfig = {
   stopLossPct: 25,
   breakevenTriggerPct: 20,
   breakevenBufferPct: 2,
+  earlyTrailPct: 18,
   takeProfitLadder: [50, 150, 400],
   trailingStopPct: 30,
   liquidityDropExitPct: 40,
@@ -34,6 +35,7 @@ export const CONSERVATIVE: RiskConfig = {
   stopLossPct: 12,
   breakevenTriggerPct: 10,
   breakevenBufferPct: 2,
+  earlyTrailPct: 10,
   takeProfitLadder: [30, 80],
   trailingStopPct: 15,
   liquidityDropExitPct: 25,
@@ -51,6 +53,7 @@ const NUMERIC_BOUNDS: Record<keyof RiskConfig, [number, number]> = {
   stopLossPct: [1, 95],
   breakevenTriggerPct: [1, 500],
   breakevenBufferPct: [0, 50],
+  earlyTrailPct: [1, 90],
   liquidityDropExitPct: [5, 95],
   takeProfitLadder: [0, 0], // handled separately
   trailingStopPct: [1, 95],

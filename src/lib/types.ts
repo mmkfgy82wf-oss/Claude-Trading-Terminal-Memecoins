@@ -159,6 +159,11 @@ export interface ClosedTrade {
   pnlUsd: number;
   /** Return on cost, in percent. */
   pnlPct: number;
+  /** How far up the trade ever was — the give-back is peak minus result. */
+  peakGainPct: number;
+  /** Deepest the pool was while held, and what was left at the exit. */
+  peakLiquidityUsd: number;
+  exitLiquidityUsd: number;
   /** How many separate exits it took — more than one means the ladder ran. */
   exits: number;
   rungsTaken: number;
@@ -191,6 +196,8 @@ export interface Position {
   breakevenTriggerPct: number;
   /** Where that stop sits, above entry, to cover round-trip costs. */
   breakevenBufferPct: number;
+  /** Trail distance while the position is armed but below the first rung. */
+  earlyTrailPct: number;
   takeProfitLadder: number[];
   /** Ladder rungs already taken. */
   filledRungs: number;
@@ -304,6 +311,13 @@ export interface RiskConfig {
   breakevenTriggerPct: number;
   /** Where the breakeven stop actually sits, above entry, to cover round-trip costs. */
   breakevenBufferPct: number;
+  /**
+   * Trail distance between the breakeven trigger and the first take-profit
+   * rung. A fixed breakeven line is only crossed once the position is already
+   * back at entry, and on a gapping asset the tick that notices is well below
+   * it — measuring from the peak instead reacts while the trade is still up.
+   */
+  earlyTrailPct: number;
   takeProfitLadder: number[];
   trailingStopPct: number;
   /**

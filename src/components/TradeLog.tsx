@@ -7,6 +7,7 @@ import type { ClosedTrade, Fill } from "@/lib/types";
 import {
   arrow,
   formatClock,
+  formatCompactUsd,
   formatNative,
   formatPct,
   formatUsdPrice,
@@ -224,6 +225,22 @@ function TradeRow({ trade, best }: { trade: ClosedTrade; best: number }) {
           {formatUsdPrice(trade.entryPriceUsd)} → {formatUsdPrice(trade.exitPriceUsd)}
         </span>
         <span>{formatDuration(trade.holdMs)} gehalten</span>
+        {trade.peakGainPct > 1 && (
+          <span
+            style={{ color: trade.peakGainPct - trade.pnlPct > 25 ? "var(--series-2-glow)" : "var(--text-muted)" }}
+            title={`Höchststand +${trade.peakGainPct.toFixed(0)}%, Ergebnis ${trade.pnlPct.toFixed(0)}% — Rückgabe ${(trade.peakGainPct - trade.pnlPct).toFixed(0)} Punkte`}
+          >
+            Peak +{trade.peakGainPct.toFixed(0)}%
+          </span>
+        )}
+        {trade.peakLiquidityUsd > 0 && trade.exitLiquidityUsd < trade.peakLiquidityUsd * 0.7 && (
+          <span
+            style={{ color: "var(--neg-glow)" }}
+            title={`Pool von ${formatCompactUsd(trade.peakLiquidityUsd)} auf ${formatCompactUsd(trade.exitLiquidityUsd)} — die Liquidität war zuerst weg, nicht der Preis.`}
+          >
+            Pool −{(((trade.peakLiquidityUsd - trade.exitLiquidityUsd) / trade.peakLiquidityUsd) * 100).toFixed(0)}%
+          </span>
+        )}
         {trade.rungsTaken > 0 && (
           <span style={{ color: "var(--pos)" }}>
             {trade.rungsTaken} TP-Stufe{trade.rungsTaken > 1 ? "n" : ""}

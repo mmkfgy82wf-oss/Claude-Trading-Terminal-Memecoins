@@ -197,6 +197,7 @@ export class PaperWallet {
       stopLossPct: risk.stopLossPct,
       breakevenTriggerPct: risk.breakevenTriggerPct,
       breakevenBufferPct: risk.breakevenBufferPct,
+      earlyTrailPct: risk.earlyTrailPct,
       takeProfitLadder: [...risk.takeProfitLadder],
       filledRungs: 0,
       peakPriceUsd: fill.priceUsd,
@@ -229,7 +230,7 @@ export class PaperWallet {
       // Judge the round trip, not this leg. A position that took a rung at
       // +50% and stopped out of the rest can still be a winner overall, and
       // scoring the last fill alone would file it as a loss.
-      this.bookTrade(fill.tokenId, fill.reason);
+      this.bookTrade(fill.tokenId, fill.reason, position, fill.liquidityUsd);
       this.positions.delete(fill.tokenId);
       return;
     }
@@ -281,7 +282,12 @@ export class PaperWallet {
   }
 
   /** Close the round trip and file it in the log. */
-  private bookTrade(tokenId: string, exitReason: string): void {
+  private bookTrade(
+    tokenId: string,
+    exitReason: string,
+    position: Position,
+    exitLiquidityUsd: number,
+  ): void {
     const trade = this.openTrades.get(tokenId);
     this.openTrades.delete(tokenId);
     if (!trade) return;
@@ -313,6 +319,15 @@ export class PaperWallet {
       pnlNative,
       pnlUsd,
       pnlPct: trade.costNative > 0 ? (pnlNative / trade.costNative) * 100 : 0,
+      // Recorded so a run can answer why an exit landed where it did: a big
+      // peak with a deep give-back means the price gapped past the rule, while
+      // a collapsed pool means the exit could not clear at any sane price.
+      peakGainPct:
+        position.entryPriceUsd > 0
+          ? ((position.peakPriceUsd - position.entryPriceUsd) / position.entryPriceUsd) * 100
+          : 0,
+      peakLiquidityUsd: position.peakLiquidityUsd,
+      exitLiquidityUsd,
       exits: trade.exits,
       rungsTaken: trade.rungsTaken,
       exitReason,
