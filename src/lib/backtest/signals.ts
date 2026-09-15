@@ -69,6 +69,9 @@ export interface SignalOptions {
   /** Take an observation every Nth frame, so neighbouring rows are not near-copies. */
   everyNthFrame?: number;
   risk?: RiskConfig;
+  /** Only frames in this window. Used to cut one tape into two samples. */
+  from?: number;
+  to?: number;
 }
 
 export async function studySignals(
@@ -88,6 +91,8 @@ export async function studySignals(
   let frameIndex = 0;
 
   for await (const frame of source.frames()) {
+    if (options.from != null && frame.t < options.from) continue;
+    if (options.to != null && frame.t > options.to) continue;
     const sample = frameIndex % stride === 0;
     frameIndex += 1;
 
@@ -258,7 +263,30 @@ export function formatSignalStudy(study: SignalStudy): string {
  * desk does per unit of it.
  */
 export function formatHorizonComparison(short: SignalStudy, long: SignalStudy): string {
-  const m = (study: SignalStudy) => Math.round(study.horizonMs / 60_000);
+  const m = (study: SignalStudy) => `${Math.round(study.horizonMs / 60_000)}m`;
+  return compareStudies(short, long, m(short), m(long), "Was bei beiden Horizonten stehen bleibt");
+}
+
+/**
+ * The same study over the first and second half of one tape.
+ *
+ * Appending to a recording does not make it independent evidence — a study over
+ * the whole file shares most of its observations with the study that came
+ * before. Cutting the tape in two and asking whether a separation survives in
+ * both halves is the cheapest honest check available, and the only one that
+ * does not need a second night.
+ */
+export function formatSplitComparison(first: SignalStudy, second: SignalStudy): string {
+  return compareStudies(first, second, "1. Hälfte", "2. Hälfte", "Was in beiden Hälften des Tapes steht");
+}
+
+function compareStudies(
+  short: SignalStudy,
+  long: SignalStudy,
+  labelA: string,
+  labelB: string,
+  title: string,
+): string {
   const byName = new Map(long.splits.map((x) => [x.name, x]));
 
   const rows = short.splits
@@ -266,12 +294,12 @@ export function formatHorizonComparison(short: SignalStudy, long: SignalStudy): 
     .filter((r): r is { a: SignalSplit; b: SignalSplit } => Boolean(r.b));
 
   const lines = [
-    `── Was bei beiden Horizonten stehen bleibt ─────────────`,
-    `${short.observations} bzw. ${long.observations} Messpunkte aus ${short.pairs} Paaren.`,
+    `── ${title} ─────────────`,
+    `${short.observations} bzw. ${long.observations} Messpunkte aus ${short.pairs} / ${long.pairs} Paaren.`,
     `Einbruchquote insgesamt: ${num(short.baselineCollapsePct)}% / ${num(long.baselineCollapsePct)}%`,
     ``,
-    `Merkmal          ${m(short)}m Rendite  ${m(short)}m Einbruch   ${m(long)}m Rendite  ${m(long)}m Einbruch  stabil`,
-    `───────────────  ───────────  ────────────   ───────────  ────────────  ──────`,
+    `Merkmal          ${labelA.padStart(9)} Rend.  ${labelA.padStart(8)} Einbr.   ${labelB.padStart(9)} Rend.  ${labelB.padStart(8)} Einbr.  stabil`,
+    `───────────────  ──────────────  ───────────────   ──────────────  ───────────────  ──────`,
   ];
 
   for (const { a, b } of rows) {
@@ -282,8 +310,8 @@ export function formatHorizonComparison(short: SignalStudy, long: SignalStudy): 
     const flag = !sameReturn ? "✗ Rendite" : !sameRisk ? "✗ Risiko" : "✓";
     lines.push(
       `${a.name.padEnd(15)}  ` +
-        `${num(a.spread).padStart(11)}  ${`${da >= 0 ? "+" : ""}${num(da)}pp`.padStart(12)}   ` +
-        `${num(b.spread).padStart(11)}  ${`${db >= 0 ? "+" : ""}${num(db)}pp`.padStart(12)}  ` +
+        `${num(a.spread).padStart(14)}  ${`${da >= 0 ? "+" : ""}${num(da)}pp`.padStart(15)}   ` +
+        `${num(b.spread).padStart(14)}  ${`${db >= 0 ? "+" : ""}${num(db)}pp`.padStart(15)}  ` +
         `${flag}`,
     );
   }
@@ -293,7 +321,7 @@ export function formatHorizonComparison(short: SignalStudy, long: SignalStudy): 
     `Rendite  = Ø Rendite der oberen minus der unteren Hälfte, in Punkten.`,
     `Einbruch = um wie viele Prozentpunkte die Einbruchquote in der oberen`,
     `           Hälfte höher liegt als in der unteren.`,
-    `stabil   = Vorzeichen stimmt bei beiden Horizonten überein.`,
+    `stabil   = Vorzeichen stimmt in beiden Spalten überein.`,
     ``,
     `Zu lesen ist das paarweise, nicht spaltenweise. Ein Merkmal, bei dem`,
     `Rendite und Einbruch gemeinsam steigen, ist kein Vorteil — es ist der`,

@@ -26,12 +26,19 @@ export const UNLIMITED: LiveLimits = {
   maxBookUsd: Infinity,
 };
 
+/**
+ * Only the string lookup is needed, so that is what the signature asks for.
+ * Requiring the full ProcessEnv would make every test construct a NODE_ENV it
+ * does not care about, which is how a test ends up testing the type system.
+ */
+export type EnvLike = Record<string, string | undefined>;
+
 function positive(raw: string | undefined): number {
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : Infinity;
 }
 
-export function limitsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveLimits {
+export function limitsFromEnv(env: EnvLike = process.env): LiveLimits {
   return {
     maxTicketUsd: positive(env.LIVE_MAX_TICKET_USD),
     maxDeployedUsd: positive(env.LIVE_MAX_DEPLOYED_USD),
@@ -39,7 +46,7 @@ export function limitsFromEnv(env: NodeJS.ProcessEnv = process.env): LiveLimits 
   };
 }
 
-export function liveTradingRequested(env: NodeJS.ProcessEnv = process.env): boolean {
+export function liveTradingRequested(env: EnvLike = process.env): boolean {
   return env.ENABLE_LIVE_TRADING === "yes-i-accept-the-risk";
 }
 
@@ -53,7 +60,7 @@ export function liveTradingRequested(env: NodeJS.ProcessEnv = process.env): bool
 export function liveStartupRefusal(
   limits: LiveLimits,
   bookUsd: number,
-  env: NodeJS.ProcessEnv = process.env,
+  env: EnvLike = process.env,
 ): string | null {
   if (!liveTradingRequested(env)) return null;
 

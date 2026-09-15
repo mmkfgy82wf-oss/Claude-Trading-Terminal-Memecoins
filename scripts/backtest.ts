@@ -7,6 +7,7 @@
  *   npm run backtest -- --tape run.jsonl --rugs      — does the pool predict the rug?
  *   npm run backtest -- --tape run.jsonl --entries   — what separated the trades it took
  *   npm run backtest -- --tape run.jsonl --signals   — …and every pair it could have taken
+ *   npm run backtest -- --tape run.jsonl --signals --split  — does it hold out of sample?
  *
  * A tape is produced by running the terminal with MARKET_RECORD set:
  *
@@ -16,7 +17,7 @@ import { inspectTape, tapeSource, type SnapshotSource } from "@/lib/backtest/sou
 import { scenarioSource } from "@/lib/backtest/scenarios";
 import { formatRugStudy, studyRugs } from "@/lib/backtest/rugs";
 import { formatEntryStudy, studyEntries } from "@/lib/backtest/entries";
-import { formatHorizonComparison, formatSignalStudy, studySignals } from "@/lib/backtest/signals";
+import { formatHorizonComparison, formatSignalStudy, formatSplitComparison, studySignals } from "@/lib/backtest/signals";
 import { replay, type EntryObservation, type ReplayResult } from "@/lib/backtest/replay";
 import { formatComparison, formatReport, poolResults } from "@/lib/backtest/report";
 import type { RiskConfig } from "@/lib/types";
@@ -116,6 +117,25 @@ async function main(): Promise<void> {
     // Two horizons by default, because one horizon cannot tell a property of
     // the market from a property of that horizon.
     const horizon = Number(args.get("horizon") ?? 30);
+
+    if (args.has("split")) {
+      // Appending to a tape does not make it independent evidence: a study over
+      // the whole file shares most of its observations with the one before it.
+      // Cutting the recording in two and asking whether a separation survives
+      // in both halves is the only out-of-sample check one file can give.
+      const stats = await inspectTape(tape);
+      const midpoint = stats.firstAt + (stats.lastAt - stats.firstAt) / 2;
+      const hours = (stats.lastAt - stats.firstAt) / 3_600_000;
+      console.log(
+        `\nGeteilt bei ${new Date(midpoint).toLocaleString("de-DE")} — ` +
+          `${(hours / 2).toFixed(1)}h je Hälfte.`,
+      );
+      const first = await studySignals(source, { horizonMs: horizon * 60_000, to: midpoint });
+      const second = await studySignals(source, { horizonMs: horizon * 60_000, from: midpoint });
+      console.log(`\n${formatSplitComparison(first, second)}`);
+      return;
+    }
+
     const short = await studySignals(source, { horizonMs: horizon * 60_000 });
     console.log(`\n${formatSignalStudy(short)}`);
 

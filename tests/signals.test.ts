@@ -129,3 +129,30 @@ test("a feature that flips sign between horizons is flagged, not ranked", async 
   assert.match(out, /dreht.*✗ Rendite/, "a sign flip in the return must be called out");
   assert.match(out, /haelt.*✓/, "a feature that holds must not be");
 });
+
+test("a time window reads only the frames inside it", async () => {
+  // Appending to a tape does not make it independent evidence, so the split
+  // check has to be able to cut one recording into two genuine samples.
+  const path = Array.from({ length: 80 }, (_, i) => ({ priceUsd: 1 + i * 0.02 }));
+  const frames = tape({ a: path, b: path });
+  const midpoint = frames[0].t + (frames[frames.length - 1].t - frames[0].t) / 2;
+
+  const whole = await studySignals(memorySource("t", frames), { horizonMs: 10 * 60_000, everyNthFrame: 1 });
+  const first = await studySignals(memorySource("t", frames), { horizonMs: 10 * 60_000, everyNthFrame: 1, to: midpoint });
+  const second = await studySignals(memorySource("t", frames), { horizonMs: 10 * 60_000, everyNthFrame: 1, from: midpoint });
+
+  assert.ok(first.observations > 0 && second.observations > 0, "both halves carry data");
+  assert.ok(first.observations < whole.observations, "a half is smaller than the whole");
+  assert.ok(second.observations < whole.observations);
+});
+
+test("a window with nothing in it is empty rather than the whole tape", async () => {
+  const path = Array.from({ length: 40 }, (_, i) => ({ priceUsd: 1 + i * 0.02 }));
+  const study = await studySignals(memorySource("t", tape({ a: path })), {
+    horizonMs: 10 * 60_000,
+    everyNthFrame: 1,
+    from: T0 + 10 * 365 * 24 * 3_600_000,
+  });
+  assert.equal(study.observations, 0);
+  assert.equal(study.pairs, 0);
+});

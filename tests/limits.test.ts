@@ -32,10 +32,10 @@ test("a comfortable balance is still mostly deployable", () => {
 });
 
 test("unset ceilings leave paper trading untouched", () => {
-  const limits = limitsFromEnv({} as NodeJS.ProcessEnv);
+  const limits = limitsFromEnv({});
   assert.deepEqual(limits, UNLIMITED);
   assert.equal(capTicketUsd(250, 900, limits), 250);
-  assert.equal(liveStartupRefusal(limits, 1_800, {} as NodeJS.ProcessEnv), null);
+  assert.equal(liveStartupRefusal(limits, 1_800, {}), null);
 });
 
 test("a ticket is clamped by both its own ceiling and the room left", () => {
@@ -47,7 +47,7 @@ test("a ticket is clamped by both its own ceiling and the room left", () => {
 });
 
 test("live trading refuses to start without deliberate ceilings", () => {
-  const env = { ENABLE_LIVE_TRADING: "yes-i-accept-the-risk" } as NodeJS.ProcessEnv;
+  const env = { ENABLE_LIVE_TRADING: "yes-i-accept-the-risk" };
   const refusal = liveStartupRefusal(limitsFromEnv(env), 100, env);
   assert.ok(refusal, "unset ceilings must refuse");
   assert.match(refusal, /ceilings/i);
@@ -59,7 +59,7 @@ test("live trading refuses a wallet holding more than the ceiling", () => {
     LIVE_MAX_TICKET_USD: "15",
     LIVE_MAX_DEPLOYED_USD: "80",
     LIVE_MAX_BOOK_USD: "120",
-  } as NodeJS.ProcessEnv;
+  };
   const limits = limitsFromEnv(env);
 
   assert.equal(liveStartupRefusal(limits, 108, env), null, "a 100-euro book passes");
@@ -74,11 +74,11 @@ test("contradictory ceilings are refused rather than silently reconciled", () =>
     LIVE_MAX_TICKET_USD: "200",
     LIVE_MAX_DEPLOYED_USD: "80",
     LIVE_MAX_BOOK_USD: "500",
-  } as NodeJS.ProcessEnv;
+  };
   assert.match(liveStartupRefusal(limitsFromEnv(env), 100, env) ?? "", /cannot both hold/);
 });
 
 test("paper runs are never gated by the live opt-in", () => {
-  const env = { LIVE_MAX_TICKET_USD: "15" } as NodeJS.ProcessEnv;
+  const env = { LIVE_MAX_TICKET_USD: "15" };
   assert.equal(liveStartupRefusal(limitsFromEnv(env), 1_000_000, env), null);
 });
