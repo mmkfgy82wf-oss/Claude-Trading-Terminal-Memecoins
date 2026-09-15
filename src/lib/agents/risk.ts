@@ -1,5 +1,7 @@
 import { now } from "@/lib/util/clock";
 import { CHAINS } from "@/lib/market/chains";
+import { deployableCashNative } from "@/lib/trading/gas";
+import { capTicketUsd, limitsFromEnv } from "@/lib/trading/limits";
 import { estimateSlippagePct } from "@/lib/trading/executor";
 import type { ChainId, TickDiagnostics, TradeIntent } from "@/lib/types";
 import { Agent, type AgentContext } from "./base";
@@ -22,6 +24,12 @@ export class RiskAgent extends Agent {
 
   /** Intents produced this tick, consumed by the orchestrator. */
   readonly pending: TradeIntent[] = [];
+
+  /**
+   * Read once, at construction. A ceiling that could be re-read mid-run is a
+   * ceiling that can be raised mid-run.
+   */
+  private readonly limits = limitsFromEnv();
 
   /**
    * Where each candidate stopped this tick.
@@ -135,6 +143,21 @@ export class RiskAgent extends Agent {
       const chainHeadroomUsd = headroomUsd.get(chain) ?? 0;
       const chainCash = cashNative.get(chain) ?? 0;
 
+      // Cash minus the gas that has to survive for the exits — including the
+      // exit of the position this ticket would open.
+      const openOnChain = wallet.openPositions().filter((p) => p.chain === chain).length + taken;
+      const deployable = deployableCashNative(chain, chainCash, openOnChain, risk);
+
+      if (chainCash > 0 && deployable <= 0) {
+        this.funnel.noCash += 1;
+        ctx.board.publish(
+          this.signal(token.id, -12, 0.75, `${quote} held back for exits`, [
+            `${chainCash.toFixed(5)} ${quote} left, all of it reserved to pay for closing ${openOnChain} position(s)`,
+          ]),
+        );
+        continue;
+      }
+
       if (chainCash <= 0) {
         this.funnel.noCash += 1;
         ctx.board.publish(
@@ -149,7 +172,13 @@ export class RiskAgent extends Agent {
       const convictionFactor = 0.45 + 0.55 * Math.min(1, (candidate.score - risk.minConsensusScore) / 35);
       let sizeUsd =
         snapshot.equityUsd * (risk.maxPositionPct / 100) * convictionFactor * candidate.confidence;
-      sizeUsd = Math.min(sizeUsd, chainHeadroomUsd, chainCash * quotePriceUsd * 0.9);
+      // Never the raw balance: the reserve above is not spendable, and the
+      // remaining 10% margin covers the fee on this ticket's own entry.
+      sizeUsd = Math.min(sizeUsd, chainHeadroomUsd, deployable * quotePriceUsd * 0.9);
+
+      // Ceilings the settings panel cannot raise. Infinite unless set, so a
+      // paper run is unaffected and a live one cannot start without them.
+      sizeUsd = capTicketUsd(sizeUsd, snapshot.positionsValueUsd, this.limits);
 
       // Never take a ticket the pool cannot absorb inside the slippage budget.
       sizeUsd = Math.min(sizeUsd, token.liquidityUsd * 0.01);

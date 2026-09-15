@@ -352,6 +352,12 @@ export interface RiskConfig {
    * same shape on a candidate. 0 switches both off.
    */
   liquidityTrendExitPct: number;
+  /**
+   * Safety factor on the gas held back for exits. 2 means twice the budgeted
+   * fee, because a priority fee in a contested block is not the fee you
+   * budgeted for.
+   */
+  gasReserveMultiple: number;
   minConsensusScore: number;
   dailyLossLimitPct: number;
 }

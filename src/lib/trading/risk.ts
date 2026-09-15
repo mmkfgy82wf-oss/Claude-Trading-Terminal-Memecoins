@@ -50,6 +50,7 @@ export const AGGRESSIVE: RiskConfig = {
   // bench that threshold never fires and costs exactly nothing; lower ones
   // fire often and cost a little. It is a catastrophe net, not an edge.
   liquidityTrendExitPct: 40,
+  gasReserveMultiple: 2,
   minConsensusScore: 55,
   dailyLossLimitPct: 35,
 };
@@ -70,6 +71,7 @@ export const CONSERVATIVE: RiskConfig = {
   minVolume24hUsd: 250_000,
   maxEntryRunPct: 300,
   liquidityTrendExitPct: 12,
+  gasReserveMultiple: 3,
   minConsensusScore: 70,
   dailyLossLimitPct: 20,
 };
@@ -92,6 +94,7 @@ const NUMERIC_BOUNDS: Record<keyof RiskConfig, [number, number]> = {
   maxPairAgeMinutes: [1, 60 * 24 * 365],
   maxEntryRunPct: [5, 1_000_000],
   liquidityTrendExitPct: [0, 95],
+  gasReserveMultiple: [1, 20],
   minConsensusScore: [0, 100],
   dailyLossLimitPct: [1, 100],
 };
