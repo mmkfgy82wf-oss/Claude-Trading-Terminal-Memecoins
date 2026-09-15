@@ -88,10 +88,16 @@ export class QuantAgent extends Agent {
     }
 
     // 2. Order-flow imbalance.
+    //
+    // Weighted to zero would mean not reading it at all, which the tape says is
+    // the right answer: the buy share flipped sign between the 30- and
+    // 90-minute horizons and again between the two halves of the recording.
+    // Kept as a knob rather than deleted, because "three checks on one night"
+    // is grounds for switching something off, not for forgetting it existed.
     const trades = token.buys5m + token.sells5m;
     if (trades > 12) {
       const imbalance = (token.buys5m - token.sells5m) / trades;
-      score += imbalance * 26;
+      score += imbalance * ctx.risk.quantFlowWeight;
       reasons.push(`flow ${imbalance >= 0 ? "+" : ""}${(imbalance * 100).toFixed(0)}% (${token.buys5m}B/${token.sells5m}S)`);
     } else {
       score -= 8;
@@ -99,14 +105,34 @@ export class QuantAgent extends Agent {
     }
 
     // 3. Volume acceleration versus its own baseline.
+    //
+    // Holds up as a predictor at every horizon — of return *and* of collapse,
+    // in the same proportion. It is the risk dial the desk has been turning
+    // all along while reading it as conviction.
     const baseline = token.volume24hUsd / 288;
     const accel = token.volume5mUsd / Math.max(1, baseline);
     if (accel > 1.5) {
-      score += Math.min(26, accel * 4.5);
+      score += Math.min(ctx.risk.quantVolumeWeight, accel * (ctx.risk.quantVolumeWeight / 5.8));
       reasons.push(`volume ${accel.toFixed(1)}x baseline`);
     } else if (accel < 0.5) {
       score -= 12;
       reasons.push("volume fading");
+    }
+
+    // 3b. Turnover against pool depth — the one reading that separated.
+    //
+    // In both halves of the recording it bought forward return at close to no
+    // extra collapse risk: +32.8 points for +0.33pp in the first half, +5.71
+    // for +0.96pp in the second. Every other feature moved return and rug rate
+    // together. SCOUT already reads it, but SCOUT carries a fifth of the
+    // consensus and QUANT carries half, so the desk has been hearing it
+    // quietly. Off by default until a backtest over the tape says otherwise.
+    if (ctx.risk.quantTurnoverWeight > 0) {
+      const turnover = token.volume24hUsd / Math.max(1, token.liquidityUsd);
+      const w = ctx.risk.quantTurnoverWeight;
+      // Full weight around 3x turnover, where SCOUT's own curve also flattens.
+      score += Math.min(w, (Math.log1p(turnover) / Math.log1p(3)) * w);
+      reasons.push(`turnover ${turnover.toFixed(1)}x pool`);
     }
 
     // 4. Extension penalty — do not pay for a move that already happened.

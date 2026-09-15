@@ -51,6 +51,9 @@ export const AGGRESSIVE: RiskConfig = {
   // fire often and cost a little. It is a catastrophe net, not an edge.
   liquidityTrendExitPct: 40,
   gasReserveMultiple: 2,
+  quantFlowWeight: 26,
+  quantVolumeWeight: 26,
+  quantTurnoverWeight: 0,
   minConsensusScore: 55,
   dailyLossLimitPct: 35,
 };
@@ -95,6 +98,9 @@ const NUMERIC_BOUNDS: Record<keyof RiskConfig, [number, number]> = {
   maxEntryRunPct: [5, 1_000_000],
   liquidityTrendExitPct: [0, 95],
   gasReserveMultiple: [1, 20],
+  quantFlowWeight: [0, 100],
+  quantVolumeWeight: [0, 100],
+  quantTurnoverWeight: [0, 100],
   minConsensusScore: [0, 100],
   dailyLossLimitPct: [1, 100],
 };

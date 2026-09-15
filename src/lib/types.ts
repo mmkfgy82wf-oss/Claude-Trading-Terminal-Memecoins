@@ -358,6 +358,22 @@ export interface RiskConfig {
    * budgeted for.
    */
   gasReserveMultiple: number;
+  /**
+   * How hard QUANT leans on each of three inputs the tape has now measured.
+   *
+   * Order-flow imbalance (`quantFlowWeight`) failed three independent checks —
+   * both horizons and both halves of the recording — and is still the second
+   * heaviest term in the heaviest vote. Volume acceleration
+   * (`quantVolumeWeight`) predicts return and predicts collapse in the same
+   * breath; it is the risk dial, not an edge. Turnover against pool depth
+   * (`quantTurnoverWeight`) is the only reading so far that bought return
+   * without buying the same amount of rug, in both halves — and QUANT does not
+   * read it at all today, which is why it defaults to zero: the default must
+   * change nothing until a backtest says otherwise.
+   */
+  quantFlowWeight: number;
+  quantVolumeWeight: number;
+  quantTurnoverWeight: number;
   minConsensusScore: number;
   dailyLossLimitPct: number;
 }
