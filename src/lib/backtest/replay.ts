@@ -44,6 +44,23 @@ export interface ReplayOptions {
    * of the tally flatters exactly the rules that hesitate.
    */
   liquidateAtEnd?: boolean;
+  /** Called once per position opened, with what the desk saw at that moment. */
+  onEntry?: (entry: EntryObservation) => void;
+}
+
+/**
+ * A position the moment it was opened: everything the desk could see about the
+ * token, plus what each agent thought of it. Joined to the trade's outcome
+ * afterwards, this is what turns "which rule should we try next" from a guess
+ * into a measurement.
+ */
+export interface EntryObservation {
+  /** `${tokenId}@${openedAt}` — the same key the closed trade can be found by. */
+  key: string;
+  tokenId: string;
+  symbol: string;
+  at: number;
+  features: Record<string, number>;
 }
 
 export interface EquityPoint {
@@ -106,6 +123,7 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
     let lastTokens: Token[] = [];
     let quotes: QuotePrices = { ...QUOTE_FALLBACK };
     let startingEquityUsd = 0;
+    const seenPositions = new Set<string>();
 
     for await (const frame of source.frames()) {
       tick += 1;
@@ -167,6 +185,15 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
         },
       );
 
+      if (options.onEntry) {
+        for (const position of wallet.openPositions()) {
+          if (seenPositions.has(position.id)) continue;
+          seenPositions.add(position.id);
+          const token = byId.get(position.tokenId);
+          if (token) options.onEntry(observe(position.id, position.tokenId, position.symbol, position.openedAt, token, board));
+        }
+      }
+
       equity.push({ t: frame.t, usd: wallet.equityUsd() });
     }
 
@@ -204,6 +231,50 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
     restoreRandom();
     restoreClock();
   }
+}
+
+/**
+ * The features are deliberately the raw things the agents already read, not
+ * derived scores of my own invention. If a ratio separates winners from losers
+ * here, it is a ratio the desk could act on tomorrow without new data.
+ */
+function observe(
+  positionId: string,
+  tokenId: string,
+  symbol: string,
+  openedAt: number,
+  token: Token,
+  board: Blackboard,
+): EntryObservation {
+  const trades = token.buys5m + token.sells5m;
+  const baseline = token.volume24hUsd / 288;
+  const consensus = board.consensus().find((c) => c.tokenId === tokenId);
+  const scoreOf = (agent: "scout" | "sentinel" | "quant" | "narrator"): number =>
+    board.signalBy(tokenId, agent)?.score ?? NaN;
+
+  return {
+    key: `${tokenId}@${openedAt}`,
+    tokenId,
+    symbol,
+    at: openedAt,
+    features: {
+      alterMin: token.ageMinutes,
+      poolUsd: token.liquidityUsd,
+      fdvZuPool: token.fdvUsd / Math.max(1, token.liquidityUsd),
+      umsatzZuPool: token.volume24hUsd / Math.max(1, token.liquidityUsd),
+      lauf1h: token.change1h,
+      lauf5m: token.change5m,
+      lauf24h: token.change24h,
+      kaufanteil: trades > 0 ? (token.buys5m / trades) * 100 : NaN,
+      volumenschub: token.volume5mUsd / Math.max(1, baseline),
+      konsens: consensus?.score ?? NaN,
+      scout: scoreOf("scout"),
+      sentinel: scoreOf("sentinel"),
+      quant: scoreOf("quant"),
+      narrator: scoreOf("narrator"),
+    },
+  };
+  void positionId;
 }
 
 function flags(chains: ChainId[]): EngineFlags {

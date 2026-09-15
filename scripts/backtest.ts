@@ -4,7 +4,8 @@
  *   npm run backtest                       — the bench, baseline only
  *   npm run backtest -- --tape run.jsonl   — a recording from a live run
  *   npm run backtest -- --compare          — baseline against the variants below
- *   npm run backtest -- --tape run.jsonl --rugs   — does the pool predict the rug?
+ *   npm run backtest -- --tape run.jsonl --rugs      — does the pool predict the rug?
+ *   npm run backtest -- --tape run.jsonl --entries   — what separates winners at entry?
  *
  * A tape is produced by running the terminal with MARKET_RECORD set:
  *
@@ -13,7 +14,8 @@
 import { inspectTape, tapeSource, type SnapshotSource } from "@/lib/backtest/source";
 import { scenarioSource } from "@/lib/backtest/scenarios";
 import { formatRugStudy, studyRugs } from "@/lib/backtest/rugs";
-import { replay, type ReplayResult } from "@/lib/backtest/replay";
+import { formatEntryStudy, studyEntries } from "@/lib/backtest/entries";
+import { replay, type EntryObservation, type ReplayResult } from "@/lib/backtest/replay";
 import { formatComparison, formatReport, poolResults } from "@/lib/backtest/report";
 import type { RiskConfig } from "@/lib/types";
 
@@ -100,6 +102,13 @@ async function main(): Promise<void> {
     }
     const minutes = Number(args.get("window") ?? 6);
     console.log(`\n${formatRugStudy(await studyRugs(source, minutes * 60_000))}`);
+    return;
+  }
+
+  if (args.has("entries")) {
+    const entries: EntryObservation[] = [];
+    const result = await replay(source, { label: "baseline", seed, onEntry: (e) => entries.push(e) });
+    console.log(`\n${formatEntryStudy(studyEntries(entries, result.trades))}`);
     return;
   }
 

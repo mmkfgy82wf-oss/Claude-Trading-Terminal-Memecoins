@@ -79,7 +79,8 @@ npm run backtest                              # Bench, Basiskonfiguration
 npm run backtest -- --tape ./tapes/nacht.jsonl
 npm run backtest -- --compare --cohorts 24    # Varianten gegeneinander
 npm run backtest -- --sweep stopLossPct=10,15,25,40
-npm run backtest -- --tape ./tapes/nacht.jsonl --rugs   # sagt der Pool den Rug voraus?
+npm run backtest -- --tape ./tapes/nacht.jsonl --rugs      # sagt der Pool den Rug voraus?
+npm run backtest -- --tape ./tapes/nacht.jsonl --entries   # was trennt Gewinner am Einstieg?
 ```
 
 `--cohorts N` würfelt N unabhängige Bench-Kohorten und poolt die Trades.
@@ -187,30 +188,79 @@ Netz und ohne Warten. „Hätte dieser Ausstieg diese Form erwischt?" beantworte
 er sofort und zuverlässig. „Verdient diese Regel Geld?" beantwortet er nicht,
 und man sollte ihn nicht fragen.
 
-## 7. Was als Nächstes zu messen ist
+## 7. Die Ausstiegsseite ist leer
 
-`npm run backtest -- --tape … --compare` fährt inzwischen diese fünf:
+Zweiter Durchlauf über dasselbe Tape, diesmal mit entkoppelter Trail-Übergabe:
 
-| Variante | Frage dahinter |
-|---|---|
-| `baseline` | der ausgelieferte Stand, der als einziger grün war |
-| `early rung` | trägt die frühe Stufe, jetzt ohne die Trail-Verkopplung? |
-| `late 150` / `late 300` | der Filter, den der Prüfstand zu Unrecht verworfen hat |
-| `drain -15` | die Schwelle, die die Rug-Auswertung nominiert hat |
+| | Basis | frühe Stufe | late 150 | late 300 | Drain −15 |
+|---|---|---|---|---|---|
+| Rendite | **+1,4 %** | −10,6 % | −6,5 % | −13,7 % | −8,9 % |
+| Gewinnfaktor | **1,04** | 0,96 | 0,97 | 0,90 | 0,97 |
+| Trades | 93 | 103 | 59 | 68 | 108 |
+| Einbrüche < −50 % | 12 | 14 | **10** | 13 | 13 |
+| Rückgabe vom Hoch | 155 pp | 63 pp | **54 pp** | 61 pp | 132 pp |
+| Max. Drawdown | 30,7 % | 37,8 % | **29,0 %** | 36,4 % | 36,5 % |
 
-Zwei Fragen bleiben offen, und beide sind am Tape auswertbar statt nur
-diskutierbar:
+Die Entkopplung hat die frühe Stufe von −31,3 % auf −10,6 % gehoben, der
+Gewinnfaktor von 0,78 auf 0,96 — die Diagnose stimmte also. Sie bleibt
+trotzdem hinter der Basis.
 
-1. **Alterfenster und SCOUT-Ranking.** Medianalter der Watchlist 1 h, im Board
-   stehen trotzdem regelmäßig deutlich ältere Paare. Ein tiefer Pool schlägt
-   offenbar die Frische.
-2. **Agenten-Attribution.** Die Konsens-Gewichte 0.5 / 0.3 / 0.2 sind
-   geschätzt und noch nie gemessen worden. Am Tape ist das eine Auswertung,
-   kein Umbau.
+**Und die Basis selbst ist nicht signifikant.** 93 Trades, Erwartungswert
+$1,03 je Trade, Standardfehler ±$5,87. Das 95-%-Intervall über den ganzen
+Lauf reicht von **−$973 bis +$1.166**; beobachtet wurden +$96. Der
+schlechteste Einzeltrade allein macht $231 aus, also mehr als das Doppelte
+des gesamten Nettogewinns.
 
-Und eine dritte, die das Tape gerade neu aufgeworfen hat: der Median der
-Pooländerung liegt vor einem Einbruch bei +2,4 %, bei Überlebenden bei 0,0 %.
-Ein Unterschied besteht also — nur nicht dort, wo eine feste Schwelle ihn
-greifen könnte. Er wäre **relativ zum eigenen Verlauf** des Paares zu messen,
-nicht absolut. Das ist noch keine Regel, aber es ist die einzige Spur, die
-das Tape auf der Rug-Seite hinterlassen hat.
+Damit lautet das Ergebnis nicht „die Basis gewinnt", sondern:
+
+> Keine der fünf Konfigurationen ist von der Nulllinie zu unterscheiden, und
+> die Abstände zwischen ihnen sind kleiner als ein einzelner Trade.
+
+Drei Runden Ausstiegs-Tuning, dreimal null oder negativ. Das ist selbst eine
+Antwort: **sobald eine Memecoin-Position offen ist, gibt es kaum noch etwas zu
+entscheiden.** Der Rug lässt sich nicht kommen sehen (Abschnitt 5), der Trail
+kann unterhalb seiner eigenen Schwelle nichts schützen, und jede Regel, die
+früher aussteigt, schneidet die Runner ab, die die Verlierer bezahlen müssen.
+
+Zwei Zahlen aus der Tabelle sagen das am deutlichsten: Die Basis hat mit
+155 pp die **mit Abstand größte Rückgabe vom Hoch** — und ist die einzige
+Variante im Plus. Jede Variante, die diese Rückgabe verkleinert (54–63 pp),
+verliert Geld. „Weniger zurückgeben" ist keine Zielgröße, sondern ein
+Nebenprodukt davon, Gewinner zu früh zu schließen.
+
+## 8. Was als Nächstes zu messen ist
+
+Die Einstiegsregeln sind aus dem Bauch geschrieben und noch nie gegen ein
+Ergebnis geprüft worden. Dafür gibt es jetzt:
+
+```bash
+npm run backtest -- --tape ./tapes/nacht.jsonl --entries
+```
+
+Für jeden Trade wird festgehalten, was das Desk im Moment des Einstiegs sehen
+konnte — Alter, Pooltiefe, FDV-Verhältnis, Umsatz, Lauf über 5 m / 1 h / 24 h,
+Kaufanteil, Volumenschub, Konsensscore **und die Einzelnote jedes Agenten**.
+Danach wird je Merkmal verglichen, wie die obere gegen die untere Hälfte
+abgeschnitten hat. Das beantwortet nebenbei die Attributionsfrage, die seit
+dem ersten Tag offen ist: ob die Gewichte 0.5 / 0.3 / 0.2 irgendetwas treffen.
+
+Es schlägt **keine Regel vor**. Bei rund hundert Trades und vierzehn Merkmalen
+sieht immer etwas nach Signal aus, und die Sortierung nach Abstand zeigt per
+Konstruktion das größte Rauschen zuerst. Ein Abstand zählt erst, wenn er auf
+einem zweiten, unabhängigen Tape wieder auftaucht — deshalb lohnt sich eine
+zweite Nacht.
+
+Eine Probe aufs Exempel steckt schon in den Tests: ein **konstantes** Merkmal
+erzeugte anfangs einen Abstand von 70 Punkten, rein aus der Reihenfolge der
+Trades, weil gleiche Werte beim Sortieren in Eingabereihenfolge stehen bleiben.
+Gleichstände gehören jetzt zu keiner Hälfte.
+
+Ohne neuen Code beantwortbar ist außerdem, ob der Konsensscore überhaupt
+rangiert:
+
+```bash
+npm run backtest -- --tape ./tapes/nacht.jsonl --sweep minConsensusScore=40,55,70,85
+```
+
+Steigt die Auszahlung mit der Schwelle, ordnet der Score. Bleibt sie flach,
+ist er Dekoration.
