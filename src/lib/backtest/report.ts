@@ -71,6 +71,8 @@ export function poolResults(label: string, runs: ReplayResult[]): ReplayResult {
     // than an average that no operator ever lived through.
     equity: [],
     pooledDrawdownPct: Math.max(...runs.map((r) => maxDrawdownPct(r))),
+    feesUsd: runs.reduce((s, r) => s + r.feesUsd, 0),
+    slippageUsd: runs.reduce((s, r) => s + r.slippageUsd, 0),
     holdReturnPct: mean(runs.map((r) => r.holdReturnPct)),
     startingEquityUsd: runs.reduce((s, r) => s + r.startingEquityUsd, 0),
     finalEquityUsd: runs.reduce((s, r) => s + r.finalEquityUsd, 0),
@@ -165,6 +167,12 @@ export function formatReport(result: ReplayResult, stats = summarise(result)): s
     `giveback    ${stats.avgGivebackPct.toFixed(1)}pp mean peak-to-exit on winners`,
     `median hold ${(stats.medianHoldMs / 60_000).toFixed(1)}m`,
   ];
+  const cost = result.feesUsd + result.slippageUsd;
+  lines.splice(6, 0,
+    `Kosten      ${usd(result.feesUsd)} Gebühren + ${usd(result.slippageUsd)} Slippage = ${usd(cost)}`,
+    `            ${(result.startingEquityUsd > 0 ? (cost / result.startingEquityUsd) * 100 : 0).toFixed(1)}% des Buchs` +
+      `  ·  ${stats.grossWinUsd > 0 ? ((cost / stats.grossWinUsd) * 100).toFixed(0) : "—"}% des Bruttogewinns`,
+  );
   if (result.forcedExits > 0) {
     lines.push(``, `note        ${result.forcedExits} position(s) closed at end of tape`);
   }
@@ -195,6 +203,14 @@ export function formatComparison(results: ReplayResult[]): string {
     ["worst trade", ...rows.map((x) => `${x.s.worstTradePct.toFixed(0)}%`)],
     ["giveback", ...rows.map((x) => `${x.s.avgGivebackPct.toFixed(0)}pp`)],
     ["max drawdown", ...rows.map((x) => `${x.s.maxDrawdownPct.toFixed(1)}%`)],
+    [
+      "Kosten % Buch",
+      ...rows.map((x) =>
+        x.r.startingEquityUsd > 0
+          ? `${(((x.r.feesUsd + x.r.slippageUsd) / x.r.startingEquityUsd) * 100).toFixed(1)}%`
+          : "—",
+      ),
+    ],
   ];
 
   const widths = head.map((_, col) => Math.max(...table.map((row) => row[col].length)));

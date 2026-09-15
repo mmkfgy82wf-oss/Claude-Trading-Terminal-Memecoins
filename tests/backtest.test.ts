@@ -168,3 +168,22 @@ test("doing nothing is reported as its own line, so a return is read against it"
   assert.ok(Math.abs(flat.holdReturnPct) < 0.01, `steady quotes hold flat, got ${flat.holdReturnPct}`);
   assert.ok(sinking.holdReturnPct < -30, `falling quotes must show up, got ${sinking.holdReturnPct}`);
 });
+
+test("what it costs to trade is reported, and a small book pays proportionally more", async () => {
+  // The question a 100-euro live book raises: gas is a fixed number of lamports
+  // whatever the ticket is worth, so it is a rounding error on a $270 order and
+  // a real drag on a $15 one. If the report cannot show that, the decision to
+  // go live is being made blind.
+  const source = scenarioSource({ seed: 31, frames: 160 });
+  const small = await replay(source, { seed: 8, risk: { startingCapitalUsd: 108 } });
+  const large = await replay(source, { seed: 8, risk: { startingCapitalUsd: 1800 } });
+
+  assert.ok(small.feesUsd > 0 && small.slippageUsd > 0, "both cost components are counted");
+  assert.ok(large.feesUsd > small.feesUsd, "a bigger book pays more in absolute terms");
+
+  const share = (r: typeof small) => (r.feesUsd + r.slippageUsd) / r.startingEquityUsd;
+  assert.ok(
+    share(small) > share(large),
+    `the small book must pay a larger share: ${(share(small) * 100).toFixed(1)}% vs ${(share(large) * 100).toFixed(1)}%`,
+  );
+});

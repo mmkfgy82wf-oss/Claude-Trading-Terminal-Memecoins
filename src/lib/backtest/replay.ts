@@ -92,6 +92,14 @@ export interface ReplayResult {
    * holding by six points, not by two.
    */
   holdReturnPct: number;
+  /**
+   * What the run paid to trade: DEX fees plus gas, and what slippage cost on
+   * top. Reported because the two scale differently with ticket size — a flat
+   * gas cost is a rounding error on a $270 order and a real drag on a $15 one,
+   * which is exactly the question a small live book raises.
+   */
+  feesUsd: number;
+  slippageUsd: number;
   /** Positions force-closed on the last frame, if any. */
   forcedExits: number;
   /** Entries the desk wanted but could not take, by reason. */
@@ -225,6 +233,14 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
       if (forcedExits > 0) equity.push({ t: lastAt, usd: wallet.equityUsd() });
     }
 
+    const closed = wallet.closedTrades(1_000_000);
+    const feesUsd = closed.reduce((sum, t) => sum + t.feesNative * wallet.quotePrice(t.chain), 0);
+    // Slippage is not booked anywhere — it is the gap between the quote and the
+    // fill — so it has to be recovered from the fills themselves.
+    const slippageUsd = wallet
+      .recentFills(1_000_000)
+      .reduce((sum, f) => sum + f.valueNative * wallet.quotePrice(f.chain) * (f.slippagePct / 100), 0);
+
     return {
       label: options.label ?? source.origin,
       origin: source.origin,
@@ -232,12 +248,14 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
       risk,
       frames,
       spanMs: Math.max(0, lastAt - firstAt),
-      trades: wallet.closedTrades(10_000),
+      trades: closed,
       equity,
       startingEquityUsd: startingEquityUsd || wallet.benchmarkUsd(),
       finalEquityUsd: wallet.equityUsd(),
       holdReturnPct:
         startingEquityUsd > 0 ? (wallet.benchmarkUsd() / startingEquityUsd - 1) * 100 : 0,
+      feesUsd,
+      slippageUsd,
       forcedExits,
       rejections,
     };
