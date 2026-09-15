@@ -241,3 +241,64 @@ export function formatSignalStudy(study: SignalStudy): string {
   );
   return lines.join("\n");
 }
+
+/**
+ * The same study at two horizons, side by side.
+ *
+ * A separation that shows up over thirty minutes and vanishes — or flips — over
+ * ninety was never a property of the market. Building that check into the tool
+ * rather than leaving it to the reader is the whole point: with nine features
+ * and one tape, something always looks like signal, and the eye is very
+ * willing to find it.
+ *
+ * The two columns that matter sit next to each other on purpose. A feature
+ * earns an entry rule only if it buys forward return *without* buying the same
+ * amount of collapse risk. If both move together, it is not an edge — it is
+ * the risk dial, and turning it changes how much is at stake, not how well the
+ * desk does per unit of it.
+ */
+export function formatHorizonComparison(short: SignalStudy, long: SignalStudy): string {
+  const m = (study: SignalStudy) => Math.round(study.horizonMs / 60_000);
+  const byName = new Map(long.splits.map((x) => [x.name, x]));
+
+  const rows = short.splits
+    .map((a) => ({ a, b: byName.get(a.name) }))
+    .filter((r): r is { a: SignalSplit; b: SignalSplit } => Boolean(r.b));
+
+  const lines = [
+    `── Was bei beiden Horizonten stehen bleibt ─────────────`,
+    `${short.observations} bzw. ${long.observations} Messpunkte aus ${short.pairs} Paaren.`,
+    `Einbruchquote insgesamt: ${num(short.baselineCollapsePct)}% / ${num(long.baselineCollapsePct)}%`,
+    ``,
+    `Merkmal          ${m(short)}m Rendite  ${m(short)}m Einbruch   ${m(long)}m Rendite  ${m(long)}m Einbruch  stabil`,
+    `───────────────  ───────────  ────────────   ───────────  ────────────  ──────`,
+  ];
+
+  for (const { a, b } of rows) {
+    const da = a.highCollapsePct - a.lowCollapsePct;
+    const db = b.highCollapsePct - b.lowCollapsePct;
+    const sameReturn = Math.sign(a.spread) === Math.sign(b.spread);
+    const sameRisk = Math.sign(da) === Math.sign(db);
+    const flag = !sameReturn ? "✗ Rendite" : !sameRisk ? "✗ Risiko" : "✓";
+    lines.push(
+      `${a.name.padEnd(15)}  ` +
+        `${num(a.spread).padStart(11)}  ${`${da >= 0 ? "+" : ""}${num(da)}pp`.padStart(12)}   ` +
+        `${num(b.spread).padStart(11)}  ${`${db >= 0 ? "+" : ""}${num(db)}pp`.padStart(12)}  ` +
+        `${flag}`,
+    );
+  }
+
+  lines.push(
+    ``,
+    `Rendite  = Ø Rendite der oberen minus der unteren Hälfte, in Punkten.`,
+    `Einbruch = um wie viele Prozentpunkte die Einbruchquote in der oberen`,
+    `           Hälfte höher liegt als in der unteren.`,
+    `stabil   = Vorzeichen stimmt bei beiden Horizonten überein.`,
+    ``,
+    `Zu lesen ist das paarweise, nicht spaltenweise. Ein Merkmal, bei dem`,
+    `Rendite und Einbruch gemeinsam steigen, ist kein Vorteil — es ist der`,
+    `Risikoregler. Interessant ist nur, wo die Rendite steigt und die`,
+    `Einbruchquote dabei ungefähr stehen bleibt.`,
+  );
+  return lines.join("\n");
+}

@@ -113,3 +113,19 @@ test("the study reports its own baseline, so a spread can be read against it", a
   assert.ok(study.baselineMeanPct > 0, "a rising tape has a positive baseline");
   assert.equal(study.baselineCollapsePct, 0);
 });
+
+test("a feature that flips sign between horizons is flagged, not ranked", async () => {
+  const { formatHorizonComparison } = await import("../src/lib/backtest/signals");
+  const split = (name: string, spread: number, low: number, high: number) => ({
+    name, n: 100, lowMeanPct: 0, highMeanPct: spread, lowMedianPct: 0, highMedianPct: 0,
+    lowCollapsePct: low, highCollapsePct: high, spread,
+  });
+  const base = { horizonMs: 30 * 60_000, pairs: 10, observations: 100, unresolved: 0, ineligible: 0, baselineMeanPct: 5, baselineCollapsePct: 4 };
+
+  const out = formatHorizonComparison(
+    { ...base, splits: [split("dreht", 20, 1, 5), split("haelt", 20, 1, 5)] },
+    { ...base, horizonMs: 90 * 60_000, splits: [split("dreht", -20, 1, 5), split("haelt", 18, 1, 4)] },
+  );
+  assert.match(out, /dreht.*✗ Rendite/, "a sign flip in the return must be called out");
+  assert.match(out, /haelt.*✓/, "a feature that holds must not be");
+});

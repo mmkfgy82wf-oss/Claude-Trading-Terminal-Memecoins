@@ -16,7 +16,7 @@ import { inspectTape, tapeSource, type SnapshotSource } from "@/lib/backtest/sou
 import { scenarioSource } from "@/lib/backtest/scenarios";
 import { formatRugStudy, studyRugs } from "@/lib/backtest/rugs";
 import { formatEntryStudy, studyEntries } from "@/lib/backtest/entries";
-import { formatSignalStudy, studySignals } from "@/lib/backtest/signals";
+import { formatHorizonComparison, formatSignalStudy, studySignals } from "@/lib/backtest/signals";
 import { replay, type EntryObservation, type ReplayResult } from "@/lib/backtest/replay";
 import { formatComparison, formatReport, poolResults } from "@/lib/backtest/report";
 import type { RiskConfig } from "@/lib/types";
@@ -113,8 +113,17 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    // Two horizons by default, because one horizon cannot tell a property of
+    // the market from a property of that horizon.
     const horizon = Number(args.get("horizon") ?? 30);
-    console.log(`\n${formatSignalStudy(await studySignals(source, { horizonMs: horizon * 60_000 }))}`);
+    const short = await studySignals(source, { horizonMs: horizon * 60_000 });
+    console.log(`\n${formatSignalStudy(short)}`);
+
+    if (!args.has("horizon")) {
+      const long = await studySignals(source, { horizonMs: 90 * 60_000 });
+      console.log(`\n\n${formatSignalStudy(long)}`);
+      console.log(`\n\n${formatHorizonComparison(short, long)}`);
+    }
     return;
   }
 

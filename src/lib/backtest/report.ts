@@ -71,6 +71,7 @@ export function poolResults(label: string, runs: ReplayResult[]): ReplayResult {
     // than an average that no operator ever lived through.
     equity: [],
     pooledDrawdownPct: Math.max(...runs.map((r) => maxDrawdownPct(r))),
+    holdReturnPct: mean(runs.map((r) => r.holdReturnPct)),
     startingEquityUsd: runs.reduce((s, r) => s + r.startingEquityUsd, 0),
     finalEquityUsd: runs.reduce((s, r) => s + r.finalEquityUsd, 0),
     forcedExits: runs.reduce((s, r) => s + r.forcedExits, 0),
@@ -137,6 +138,8 @@ function maxDrawdownPct(result: ReplayResult): number {
   return worst;
 }
 
+const mean = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
 const usd = (n: number) => `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 const ratio = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "∞");
@@ -148,6 +151,7 @@ export function formatReport(result: ReplayResult, stats = summarise(result)): s
     `source      ${result.kind} · ${result.origin}`,
     `span        ${result.frames} frames over ${hours.toFixed(1)}h`,
     `equity      ${usd(result.startingEquityUsd)} → ${usd(result.finalEquityUsd)}  (${pct(stats.returnPct)})`,
+    `vs. halten  ${pct(result.holdReturnPct)} vom Nichtstun  ·  Vorsprung ${pct(stats.returnPct - result.holdReturnPct)}`,
     `drawdown    ${stats.maxDrawdownPct.toFixed(1)}% max`,
     ``,
     `trades      ${stats.trades}  ·  ${stats.wins}W / ${stats.losses}L  ·  hit ${stats.hitRatePct.toFixed(0)}%`,
@@ -181,6 +185,7 @@ export function formatComparison(results: ReplayResult[]): string {
   const table: string[][] = [
     head,
     ["return", ...rows.map((x) => pct(x.s.returnPct))],
+    ["vs. halten", ...rows.map((x) => pct(x.s.returnPct - x.r.holdReturnPct))],
     ["net P/L", ...rows.map((x) => usd(x.s.netUsd))],
     ["trades", ...rows.map((x) => `${x.s.trades} (${x.s.wins}W/${x.s.losses}L)`)],
     ["hit rate", ...rows.map((x) => `${x.s.hitRatePct.toFixed(0)}%`)],

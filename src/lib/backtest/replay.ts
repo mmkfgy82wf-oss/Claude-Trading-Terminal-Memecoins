@@ -81,6 +81,17 @@ export interface ReplayResult {
   equity: EquityPoint[];
   startingEquityUsd: number;
   finalEquityUsd: number;
+  /**
+   * What the book would have done untouched: the funded treasuries valued at
+   * the tape's closing quote prices.
+   *
+   * Without this every return above is read against zero, which is the wrong
+   * line. Over one recorded night SOL and ETH fell 3.6%, so a configuration
+   * that made 0% beat one that made -3% by doing nothing at all — and a
+   * configuration that took a hundred trades to reach +2.3% only cleared
+   * holding by six points, not by two.
+   */
+  holdReturnPct: number;
   /** Positions force-closed on the last frame, if any. */
   forcedExits: number;
   /** Entries the desk wanted but could not take, by reason. */
@@ -225,6 +236,8 @@ export async function replay(source: SnapshotSource, options: ReplayOptions = {}
       equity,
       startingEquityUsd: startingEquityUsd || wallet.benchmarkUsd(),
       finalEquityUsd: wallet.equityUsd(),
+      holdReturnPct:
+        startingEquityUsd > 0 ? (wallet.benchmarkUsd() / startingEquityUsd - 1) * 100 : 0,
       forcedExits,
       rejections,
     };

@@ -229,7 +229,73 @@ Variante im Plus. Jede Variante, die diese Rückgabe verkleinert (54–63 pp),
 verliert Geld. „Weniger zurückgeben" ist keine Zielgröße, sondern ein
 Nebenprodukt davon, Gewinner zu früh zu schließen.
 
-## 8. Was als Nächstes zu messen ist
+## 8. Was das Tape über den Einstieg sagt
+
+`--signals`, 1108 Paare, 8953 Messpunkte über 30 Minuten und 7583 über 90.
+Nur was bei **beiden** Horizonten mit gleichem Vorzeichen steht, zählt.
+
+| Merkmal | Rendite 30 / 90 | Einbruchquote unten → oben |
+|---|---|---|
+| Volumenschub | +39,5 / +27,5 | 0,09 % → **7,55 %** |
+| Lauf 1 h | +33,2 / +21,4 | 1,09 % → 6,55 % |
+| Umsatz zu Pool | +30,0 / +16,7 | 3,52 % → **4,21 %** |
+| Alter | −33,9 / −21,0 | 7,03 % → 0,61 % |
+| Lauf 24 h | −27,0 / −19,8 | 2,28 % → 5,36 % |
+| FDV zu Pool | −12,5 / −13,0 | 1,54 % → 6,10 % |
+| Kaufanteil | +23,8 / **−5,1** | — Vorzeichen dreht |
+| Pooltiefe | −34,5 / −7,2 | — bricht zusammen |
+
+**Der zentrale Befund: Rendite und Rug-Risiko sind dieselbe Achse.**
+
+Jedes Merkmal, das höhere Rendite vorhersagt, sagt im selben Atemzug eine
+höhere Einbruchquote voraus. Ein Volumenschub in der oberen Hälfte bringt
++39,5 Punkte Rendite — und **das 84-fache Rug-Risiko** (0,09 % → 7,55 %).
+Junge Paare rentieren besser und brechen 11-mal häufiger ein.
+
+Das erklärt rückwirkend alles aus Abschnitt 7. Jeder Filter, den wir probiert
+haben, hat Rendite *und* Rugs im gleichen Verhältnis reduziert. Deshalb hat
+sich der Gewinnfaktor nie bewegt: **wir haben am Risikoregler gedreht, nicht
+an der Qualität.**
+
+Eine Ausnahme ist einen zweiten Blick wert: **Umsatz zu Pool** kauft +30
+Punkte Rendite für nur +0,7 Punkte Einbruchquote, und bleibt bei 90 Minuten
+stabil. Das ist mit Abstand das beste Verhältnis der Tabelle. Es ist noch
+keine Regel — SCOUT liest den Turnover bereits, gewichtet ihn aber niedriger
+als QUANT den Volumenschub, also die riskantere der beiden Größen.
+
+Zwei Merkmale sind Rauschen und sollten aus der Bewertung verschwinden:
+**Kaufanteil** dreht zwischen den Horizonten das Vorzeichen — QUANT gewichtet
+genau das mit bis zu 26 Punkten — und **Pooltiefe** bricht von −34,5 auf −7,2
+zusammen.
+
+### Der Konsensscore rangiert nicht
+
+| Schwelle | 40 | 55 | 70 | 85 |
+|---|---|---|---|---|
+| Rendite | −15,5 % | **+2,3 %** | −16,8 % | −3,6 % (0 Trades) |
+| Gewinnfaktor | 0,91 | 1,04 | 0,86 | — |
+
+Würde der Score ordnen, müsste eine höhere Schwelle monoton besser werden.
+Sie tut es nicht: 40 schlecht, 55 gut, 70 schlecht. Dass ausgerechnet 55
+positiv ist, ist der Wert, der seit jeher voreingestellt war — und bei rund
+hundert Trades liegt der ganze Bereich innerhalb des Rauschens aus Abschnitt 7.
+
+### Und eine Korrektur an allem, was vorher hier stand
+
+Bei Schwelle 85 macht das Desk **null Trades** — und verliert trotzdem 3,6 %.
+Die Kassen halten SOL und ETH nativ, und beide sind über die Nacht gefallen.
+
+**−3,6 % ist also die Nulllinie, nicht 0 %.** Jede Rendite in diesem Dokument
+war gegen die falsche Linie gelesen. Der Report druckt seitdem eine Zeile
+`vs. halten` mit, und der Variantenvergleich eine Zeile `vs. halten`.
+
+Damit sieht der Stand aus Abschnitt 7 anders aus: die Basis mit +1,4 % schlägt
+das Nichtstun um rund fünf Punkte statt um anderthalb. Signifikant ist sie
+deshalb immer noch nicht — das 95-%-Intervall reicht weiter als dieser
+Vorsprung —, aber die Richtung ist eine andere als gedacht.
+
+## 9. Was als Nächstes zu messen ist
+
 
 Die Einstiegsregeln sind aus dem Bauch geschrieben und noch nie gegen ein
 Ergebnis geprüft worden. Dafür gibt es jetzt:

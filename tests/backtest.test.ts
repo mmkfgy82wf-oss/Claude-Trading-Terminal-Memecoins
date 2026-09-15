@@ -147,3 +147,24 @@ test("a tape on disk replays like one in memory", async () => {
   assert.equal(fromDisk.frames, fromMemory.frames);
   assert.equal(fromDisk.finalEquityUsd, fromMemory.finalEquityUsd);
 });
+
+test("doing nothing is reported as its own line, so a return is read against it", async () => {
+  // Over a recorded night SOL and ETH fell 3.6%, which made a flat run look
+  // like a loss and a small gain look larger than it was. The hold benchmark
+  // has to come from the tape's own quote prices, not from zero.
+  const { memorySource } = await import("../src/lib/backtest/source");
+  const frames = [];
+  for await (const frame of scenarioSource({ seed: 21, frames: 40 }).frames()) frames.push(frame);
+
+  // Same market, but the quote assets halve across the tape.
+  const falling = frames.map((f, i) => ({
+    ...f,
+    quotes: { solana: 180 * (1 - i / (frames.length * 2)), robinhood: 3200 * (1 - i / (frames.length * 2)) },
+  }));
+
+  const flat = await replay(memorySource("flat", frames), { seed: 3 });
+  const sinking = await replay(memorySource("sinking", falling), { seed: 3 });
+
+  assert.ok(Math.abs(flat.holdReturnPct) < 0.01, `steady quotes hold flat, got ${flat.holdReturnPct}`);
+  assert.ok(sinking.holdReturnPct < -30, `falling quotes must show up, got ${sinking.holdReturnPct}`);
+});
