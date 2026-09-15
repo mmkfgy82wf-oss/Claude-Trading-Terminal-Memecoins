@@ -80,7 +80,8 @@ npm run backtest -- --tape ./tapes/nacht.jsonl
 npm run backtest -- --compare --cohorts 24    # Varianten gegeneinander
 npm run backtest -- --sweep stopLossPct=10,15,25,40
 npm run backtest -- --tape ./tapes/nacht.jsonl --rugs      # sagt der Pool den Rug voraus?
-npm run backtest -- --tape ./tapes/nacht.jsonl --entries   # was trennt Gewinner am Einstieg?
+npm run backtest -- --tape ./tapes/nacht.jsonl --entries   # was trennte die Trades, die es nahm?
+npm run backtest -- --tape ./tapes/nacht.jsonl --signals   # … und alle, die es hätte nehmen können
 ```
 
 `--cohorts N` würfelt N unabhängige Bench-Kohorten und poolt die Trades.
@@ -246,9 +247,32 @@ dem ersten Tag offen ist: ob die Gewichte 0.5 / 0.3 / 0.2 irgendetwas treffen.
 
 Es schlägt **keine Regel vor**. Bei rund hundert Trades und vierzehn Merkmalen
 sieht immer etwas nach Signal aus, und die Sortierung nach Abstand zeigt per
-Konstruktion das größte Rauschen zuerst. Ein Abstand zählt erst, wenn er auf
-einem zweiten, unabhängigen Tape wieder auftaucht — deshalb lohnt sich eine
-zweite Nacht.
+Konstruktion das größte Rauschen zuerst.
+
+### Warum `--signals` die stärkere Frage stellt
+
+`--entries` teilt 93 Trades in Hälften à 46. Das ist **weniger** Aussagekraft
+als der Variantenvergleich, der schon nichts trennen konnte — und es leidet
+zusätzlich an einer Auswahlverzerrung: es sieht nur, was das Desk gekauft hat.
+
+Auf demselben Tape liegen aber **1087 Paare**. `--signals` fragt dieselbe Frage
+an die ganze Population: für jedes Paar, das die Filter des Desks passiert
+hätte, an jedem gemessenen Punkt — was haben die nächsten 30 Minuten getan?
+Das sind Tausende von Messpunkten aus derselben Datei, ohne neue Aufzeichnung.
+
+Die entscheidende Spalte ist die letzte: der Anteil der Messpunkte, die in
+diesen 30 Minuten 70 % oder mehr verloren haben. Rugs machen den Verlust aus,
+also ist „welche Ablesung geht einem Einbruch voraus" mehr wert als jeder
+Durchschnitt.
+
+Zwei Einschränkungen stehen unter der Tabelle und sind ernst gemeint:
+Messpunkte desselben Paares sind **nicht unabhängig** — ein Paar, das lange
+lebt, liefert viele —, und der Median steht neben dem Mittelwert, weil ein
+einzelner Runner jeden Durchschnitt hebt.
+
+Beide Auswertungen teilen sich dieselbe Merkmalsdefinition
+(`src/lib/backtest/features.ts`), damit ihre Zahlen überhaupt vergleichbar
+sind.
 
 Eine Probe aufs Exempel steckt schon in den Tests: ein **konstantes** Merkmal
 erzeugte anfangs einen Abstand von 70 Punkten, rein aus der Reihenfolge der

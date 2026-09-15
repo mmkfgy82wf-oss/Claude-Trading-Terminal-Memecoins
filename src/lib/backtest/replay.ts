@@ -13,6 +13,7 @@ import { PaperWallet, type QuotePrices } from "@/lib/trading/wallet";
 import type { ChainId, ClosedTrade, EngineFlags, PricePoint, RiskConfig, Token } from "@/lib/types";
 import { setClock, VirtualClock } from "@/lib/util/clock";
 import { seeded, setRandom } from "@/lib/util/random";
+import { tokenFeatures } from "./features";
 import type { SnapshotSource } from "./source";
 
 /**
@@ -246,8 +247,6 @@ function observe(
   token: Token,
   board: Blackboard,
 ): EntryObservation {
-  const trades = token.buys5m + token.sells5m;
-  const baseline = token.volume24hUsd / 288;
   const consensus = board.consensus().find((c) => c.tokenId === tokenId);
   const scoreOf = (agent: "scout" | "sentinel" | "quant" | "narrator"): number =>
     board.signalBy(tokenId, agent)?.score ?? NaN;
@@ -258,15 +257,7 @@ function observe(
     symbol,
     at: openedAt,
     features: {
-      alterMin: token.ageMinutes,
-      poolUsd: token.liquidityUsd,
-      fdvZuPool: token.fdvUsd / Math.max(1, token.liquidityUsd),
-      umsatzZuPool: token.volume24hUsd / Math.max(1, token.liquidityUsd),
-      lauf1h: token.change1h,
-      lauf5m: token.change5m,
-      lauf24h: token.change24h,
-      kaufanteil: trades > 0 ? (token.buys5m / trades) * 100 : NaN,
-      volumenschub: token.volume5mUsd / Math.max(1, baseline),
+      ...tokenFeatures(token),
       konsens: consensus?.score ?? NaN,
       scout: scoreOf("scout"),
       sentinel: scoreOf("sentinel"),
