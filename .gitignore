@@ -8,3 +8,8 @@ build/
 next-env.d.ts
 .DS_Store
 data/*.json
+
+# Wallet keys never belong in the tree — SOLANA_KEYPAIR_PATH must point outside it.
+*.keypair.json
+secrets/
+tapes/
