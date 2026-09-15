@@ -111,3 +111,78 @@ export function lamportDelta(meta: RpcTransactionMeta, accountIndex: number): bi
   if (typeof before !== "number" || typeof after !== "number") return null;
   return BigInt(after) - BigInt(before) + BigInt(meta.fee ?? 0);
 }
+
+/** What the wallet actually holds of one mint, straight from the chain. */
+export interface TokenHolding {
+  /** Base units. */
+  amount: bigint;
+  decimals: number;
+  /** The associated token account the balance sits in. */
+  account: string;
+}
+
+interface RpcTokenAccount {
+  pubkey: string;
+  account: {
+    data: {
+      parsed?: {
+        info?: {
+          tokenAmount?: { amount?: string; decimals?: number };
+        };
+      };
+    };
+  };
+}
+
+/**
+ * Ask the chain what the wallet holds, rather than trusting the book.
+ *
+ * A sell sized from the book's own quantity is a sell sized from a number that
+ * has never been checked against reality. Every partial fill, every rounding
+ * step and every transaction whose outcome we recorded as "unknown" widens the
+ * gap, and the first symptom is a sell that reverts for insufficient funds —
+ * at full fee, in the middle of an exit. It also answers the decimals, which
+ * no price aggregator reports and which a swap cannot be sized without.
+ */
+export async function tokenHolding(
+  endpoint: string,
+  owner: string,
+  mint: string,
+): Promise<TokenHolding | null> {
+  const res = await rpc<{ value: RpcTokenAccount[] }>(endpoint, "getTokenAccountsByOwner", [
+    owner,
+    { mint },
+    { encoding: "jsonParsed", commitment: "confirmed" },
+  ]);
+  if (!res.ok) return null;
+
+  const accounts = res.value.value ?? [];
+  if (accounts.length === 0) return null;
+
+  // A wallet can hold the same mint in more than one account. The deepest is
+  // the one a swap should be sized against; the others are dust or leftovers.
+  let best: TokenHolding | null = null;
+  for (const entry of accounts) {
+    const raw = entry.account?.data?.parsed?.info?.tokenAmount;
+    const decimals = typeof raw?.decimals === "number" ? raw.decimals : null;
+    if (!raw?.amount || decimals === null) continue;
+    let amount: bigint;
+    try {
+      amount = BigInt(raw.amount);
+    } catch {
+      continue;
+    }
+    if (!best || amount > best.amount) best = { amount, decimals, account: entry.pubkey };
+  }
+  return best;
+}
+
+/** Lamports the wallet holds. Used to keep the treasury honest. */
+export async function solBalance(endpoint: string, owner: string): Promise<bigint | null> {
+  const res = await rpc<{ value: number }>(endpoint, "getBalance", [
+    owner,
+    { commitment: "confirmed" },
+  ]);
+  if (!res.ok || typeof res.value.value !== "number") return null;
+  return BigInt(Math.round(res.value.value));
+}

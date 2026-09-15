@@ -1,5 +1,8 @@
 import { MarketFeed } from "@/lib/market/feed";
 import { recorderFromEnv, type TickRecorder } from "@/lib/market/recorder";
+import { LiveSolanaExecutor } from "@/lib/live/executor";
+import { haltReason, reconcile } from "@/lib/live/reconcile";
+import { liveTradingRequested } from "@/lib/trading/limits";
 import { fetchQuotePrices, providerFlags } from "@/lib/market/providers";
 import { PaperExecutor } from "@/lib/trading/executor";
 import { AGGRESSIVE, sanitizeRisk } from "@/lib/trading/risk";
@@ -51,7 +54,8 @@ export class Orchestrator {
   private readonly quant = new QuantAgent();
   private readonly narrator = new NarratorAgent();
   private readonly riskAgent = new RiskAgent();
-  private readonly executor = new ExecutorAgent(new PaperExecutor());
+  /** Swapped for a live executor at boot when the wallet and ceilings are in place. */
+  private executor = new ExecutorAgent(new PaperExecutor());
 
   private risk: RiskConfig = { ...AGGRESSIVE };
   private autonomy: AutonomyMode = "auto";
@@ -72,6 +76,9 @@ export class Orchestrator {
   private restored = false;
   /** Writes the live feed to disk when MARKET_RECORD is set, for the backtest. */
   private readonly recorder: TickRecorder | null = recorderFromEnv();
+  /** Set when the book and the wallet have drifted far enough to stop buying. */
+  private liveHalt: string | null = null;
+  private liveWallet: string | null = null;
 
   constructor() {
     this.wallet = new PaperWallet(this.risk.startingCapitalUsd, this.chains, this.quotePrices);
@@ -130,6 +137,8 @@ export class Orchestrator {
         );
       }
     }
+    this.attachLiveExecutor();
+
     if (this.recorder) {
       this.log(
         "system",
@@ -137,6 +146,58 @@ export class Orchestrator {
       );
     }
     void this.loop();
+  }
+
+  /**
+   * Go live, or say why not.
+   *
+   * Refusing is the normal outcome and is logged at system level rather than
+   * as an error: a paper desk that mentions live trading every boot trains the
+   * operator to ignore the line that matters.
+   */
+  private attachLiveExecutor(): void {
+    const endpoint = process.env.SOLANA_RPC_URL;
+    if (!liveTradingRequested()) return;
+
+    if (!endpoint) {
+      this.log("error", "Live trading requested but SOLANA_RPC_URL is unset — staying on paper.");
+      return;
+    }
+    const made = LiveSolanaExecutor.create(endpoint);
+    if ("refusal" in made) {
+      this.log("error", `Live trading refused: ${made.refusal}`);
+      return;
+    }
+
+    this.executor = new ExecutorAgent(made.executor);
+    this.liveWallet = made.executor.publicKey;
+    this.log("system", `LIVE on Solana · wallet ${this.liveWallet} · real orders will be sent`);
+  }
+
+  /**
+   * Compare the book against the wallet, and stop buying if it claims more
+   * than is there. Exits stay open on purpose: the answer to a book that has
+   * drifted is to get out of what is real, not to freeze holding it.
+   */
+  private async reconcileLive(): Promise<void> {
+    if (!this.liveWallet) return;
+    const endpoint = process.env.SOLANA_RPC_URL;
+    if (!endpoint) return;
+
+    const result = await reconcile(
+      endpoint,
+      this.liveWallet,
+      this.wallet.openPositions().filter((p) => p.chain === "solana"),
+      this.wallet.cashOn("solana"),
+    );
+    const halt = haltReason(result);
+    if (halt && halt !== this.liveHalt) {
+      this.log("error", halt);
+    }
+    if (!halt && this.liveHalt) {
+      this.log("system", "Book and wallet agree again — entries released.");
+    }
+    this.liveHalt = halt;
   }
 
   stop(): void {
@@ -194,6 +255,10 @@ export class Orchestrator {
         (ctx) => this.routeIntents(ctx),
       );
 
+      // Every twentieth tick: often enough to catch a drift within a couple of
+      // minutes, rare enough not to spend the RPC budget on it.
+      if (this.liveWallet && this.tick % 20 === 0) await this.reconcileLive();
+
       this.expireApprovals();
       this.emit();
       this.persist();
@@ -206,6 +271,8 @@ export class Orchestrator {
   private async routeIntents(ctx: AgentContext): Promise<void> {
     for (const intent of this.riskAgent.pending) {
       if (this.killSwitch) continue;
+      // A drifted book must not open anything new. Exits are untouched.
+      if (this.liveHalt) continue;
       if (this.autonomy === "auto") {
         await this.executor.enter(intent, ctx);
         continue;
