@@ -187,23 +187,39 @@ function verdict(study: RugStudy): string[] {
   )[0];
   const out: string[] = [];
 
+  // The bar is deliberately high. A threshold that catches one rug in six is
+  // arithmetically "better than nothing" and practically nothing: five of six
+  // still land in full, and the desk pays the false alarms every time.
+  const USEFUL_CATCH_PCT = 40;
+  const USEFUL_EDGE = 25;
+  const edge = best.catchRatePct - best.falsePositiveRatePct;
+
   if (best.catchRatePct === 0) {
     out.push(
       `Keine der Schwellen fängt auch nur einen Einbruch. Auf diesen Daten`,
       `leert sich der Pool vor einem Rug nicht — er wird bis zuletzt gefüllt.`,
     );
-  } else if (best.catchRatePct - best.falsePositiveRatePct < 10) {
+  } else if (best.catchRatePct < USEFUL_CATCH_PCT || edge < USEFUL_EDGE) {
     out.push(
-      `Kein brauchbarer Abstand: -${best.thresholdPct}% fängt ${best.catchRatePct.toFixed(0)}% der Einbrüche und`,
-      `wirft dafür ${best.falsePositiveRatePct.toFixed(0)}% der gesunden Paare weg. Das ist Rauschen, keine Regel.`,
+      `Zu schwach zum Handeln. Die beste Schwelle (-${best.thresholdPct}%) fängt ${best.catchRatePct.toFixed(0)}% der`,
+      `Einbrüche — ${(100 - best.catchRatePct).toFixed(0)}% treffen also weiterhin voll — bei ${best.falsePositiveRatePct.toFixed(0)}% Fehlalarmen.`,
+      `Als Regel wäre das vor allem ein Weg, gesunde Positionen zu verlieren.`,
     );
   } else {
     out.push(
-      `Bester Abstand bei -${best.thresholdPct}%: fängt ${best.catchRatePct.toFixed(0)}% der Einbrüche,`,
-      `kostet ${best.falsePositiveRatePct.toFixed(0)}% Fehlalarme — Vorsprung ${(best.catchRatePct - best.falsePositiveRatePct).toFixed(0)} Punkte.`,
-      `Kandidat für liquidityTrendExitPct. Vorher gegen den Tape backtesten.`,
+      `Kandidat: -${best.thresholdPct}% fängt ${best.catchRatePct.toFixed(0)}% der Einbrüche bei ${best.falsePositiveRatePct.toFixed(0)}% Fehlalarmen,`,
+      `Vorsprung ${edge.toFixed(0)} Punkte. Vor dem Übernehmen gegen dasselbe Tape`,
+      `backtesten — ob die Regel Geld verdient, sagt diese Tabelle nicht.`,
     );
   }
+
+  out.push(
+    ``,
+    `Zur Einordnung der Fehlalarmquote: gezählt wird ein Messpunkt je`,
+    `überlebendem Paar. Live wird die Regel bei jedem Tick auf jede offene`,
+    `Position angewandt — die tatsächliche Auslösehäufigkeit liegt also`,
+    `höher als hier. Diese Spalte ist eine Untergrenze, keine Prognose.`,
+  );
 
   const gap = median(study.preCollapseLiquidityPct) - median(study.survivorLiquidityPct);
   if (Number.isFinite(gap) && Math.abs(gap) >= 8) {

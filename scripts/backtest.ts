@@ -47,25 +47,23 @@ function parseArgs(argv: string[]) {
  * telling us which part earned it.
  */
 const VARIANTS: Variant[] = [
-  // The state the desk was in during the overnight run, so every row below is
-  // measured against what actually lost the money rather than against itself.
-  {
-    label: "before",
-    risk: { takeProfitLadder: [50, 150, 400], liquidityTrendExitPct: 0, maxEntryRunPct: 100_000 },
-  },
-  {
-    label: "+early rung",
-    risk: { takeProfitLadder: [25, 90, 300], liquidityTrendExitPct: 0, maxEntryRunPct: 100_000 },
-  },
-  {
-    label: "+drain trend",
-    risk: { takeProfitLadder: [50, 150, 400], liquidityTrendExitPct: 20, maxEntryRunPct: 100_000 },
-  },
-  {
-    label: "+late filter",
-    risk: { takeProfitLadder: [50, 150, 400], liquidityTrendExitPct: 0, maxEntryRunPct: 150 },
-  },
-  { label: "shipped", risk: {} },
+  // The shipped default, and on 13.9h of recorded market the only variant that
+  // finished green. Everything below is measured against it.
+  { label: "baseline", risk: {} },
+
+  // The early rung, retried now that the trail handover no longer moves with
+  // it. Its first run conflated two changes; this one isolates the ladder.
+  { label: "early rung", risk: { takeProfitLadder: [25, 90, 300] } },
+
+  // On the bench this was the worst variant by a distance. On the tape it came
+  // second and had the lowest drawdown of all five, which is the clearest
+  // single demonstration that the bench's mix was not the market's.
+  { label: "late 150", risk: { maxEntryRunPct: 150 } },
+  { label: "late 300", risk: { maxEntryRunPct: 300 } },
+
+  // What the rug study nominated: the threshold with the widest gap between
+  // collapses caught and healthy pairs thrown away.
+  { label: "drain -15", risk: { liquidityTrendExitPct: 15 } },
 ];
 
 async function main(): Promise<void> {

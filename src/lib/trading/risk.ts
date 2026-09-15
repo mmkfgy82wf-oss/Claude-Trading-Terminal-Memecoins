@@ -18,12 +18,17 @@ export const AGGRESSIVE: RiskConfig = {
   breakevenTriggerPct: 14,
   breakevenBufferPct: 2,
   earlyTrailPct: 12,
-  // The first rung is early on purpose. A one-block liquidity pull cannot be
-  // stopped out of — the next quote the desk sees is already the bottom — so
-  // the only defence available to a position that is already open is to be
-  // smaller by the time it happens. Selling 40% at +25% turned the bench's
-  // worst trade from -97% into -49% and removed both blow-ups.
-  takeProfitLadder: [25, 90, 300],
+  // Reverted from [25, 90, 300] after 13.9 hours of recorded market said so.
+  //
+  // The argument for the early rung was sound and the bench agreed with it: a
+  // liquidity pull cannot be stopped out of, so the only defence left to an
+  // open position is being smaller when it lands. On the tape it lost money on
+  // every heading — return +1.2% → -31.3%, profit factor 1.04 → 0.78, drawdown
+  // 30.7% → 50.7% — and, against the whole point of the change, blow-ups worse
+  // than -50% went *up*, 12 → 15. Freed capital opens more positions (93 → 100
+  // trades), and more positions means more rugs; the smaller loss per rug did
+  // not pay for the extra ones. See docs/BACKTEST.md.
+  takeProfitLadder: [50, 150, 400],
   // Worth knowing: a trail of X% cannot close above entry until the peak has
   // cleared X/(1-X), so this one needs +43% before it protects any profit at
   // all. Below that the early rung and the breakeven floor are what stand in.

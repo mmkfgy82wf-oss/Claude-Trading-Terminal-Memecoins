@@ -111,6 +111,6 @@ expliziter Opt-in-Flag gesetzt sind.
 | Datei | Inhalt |
 |---|---|
 | **[docs/BETRIEB.md](docs/BETRIEB.md)** | **Dauerbetrieb** — Docker, systemd, Persistenz, Erreichbarkeit |
-| **[docs/BACKTEST.md](docs/BACKTEST.md)** | **Regeln messen** — Tape aufzeichnen, Backtest laufen lassen, was gemessen wurde und was das Bench nicht kann |
+| **[docs/BACKTEST.md](docs/BACKTEST.md)** | **Regeln messen** — Tape aufzeichnen, Backtest laufen lassen, und warum der synthetische Prüfstand bei zwei von zwei Urteilen falsch lag |
 | **[docs/TERMINAL.md](docs/TERMINAL.md)** | **Die Oberfläche lesen** — was pro Tick passiert, jedes Panel, jede Zahl, jeder Marker, plus Symptom→Ursache-Tabelle |
 | [PROJEKT.md](PROJEKT.md) | Architektur, Agenten, Entscheidungen, Tests, bekannte Grenzen |

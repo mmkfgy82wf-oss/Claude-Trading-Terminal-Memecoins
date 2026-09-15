@@ -6,7 +6,7 @@ import type { AgentContext } from "../src/lib/agents/base";
 import { PaperWallet } from "../src/lib/trading/wallet";
 import { PaperExecutor } from "../src/lib/trading/executor";
 import { AGGRESSIVE } from "../src/lib/trading/risk";
-import type { ChainId, Fill, Token } from "../src/lib/types";
+import type { ChainId, Fill, RiskConfig, Token } from "../src/lib/types";
 
 /**
  * The two failure modes an overnight run on live data made visible:
@@ -45,14 +45,18 @@ function token(over: Partial<Token> = {}): Token {
   };
 }
 
-function ctxFor(t: Token, wallet: PaperWallet): AgentContext & { board: Blackboard } {
+function ctxFor(
+  t: Token,
+  wallet: PaperWallet,
+  risk: Partial<RiskConfig> = {},
+): AgentContext & { board: Blackboard } {
   const board = new Blackboard();
   board.setUniverse([t]);
   return {
     tick: 1,
     board,
     wallet,
-    risk: { ...AGGRESSIVE },
+    risk: { ...AGGRESSIVE, ...risk },
     flags: {
       autonomy: "auto", killSwitch: false, marketMode: "live", chains: ACTIVE,
       narrativeAugmented: false, providers: { birdeye: false, helius: false, anthropic: false },
@@ -62,12 +66,15 @@ function ctxFor(t: Token, wallet: PaperWallet): AgentContext & { board: Blackboa
 }
 
 /** Open a position, then walk the price (and optionally the pool) and let the desk react. */
-async function run(path: { price: number; liquidity?: number }[]): Promise<{ exits: Fill[]; wallet: PaperWallet }> {
+async function run(
+  path: { price: number; liquidity?: number }[],
+  riskOver: Partial<RiskConfig> = {},
+): Promise<{ exits: Fill[]; wallet: PaperWallet }> {
   const wallet = new PaperWallet(BOOK, ACTIVE, PRICES);
   const executor = new ExecutorAgent(new PaperExecutor());
   const entry = token();
 
-  let ctx = ctxFor(entry, wallet);
+  let ctx = ctxFor(entry, wallet, riskOver);
   await executor.enter(
     { id: "i1", tokenId: entry.id, symbol: entry.symbol, chain: "solana", side: "buy",
       sizeNative: 1, quote: "SOL", reason: "test", consensusScore: 80, confidence: 0.9,
@@ -77,7 +84,7 @@ async function run(path: { price: number; liquidity?: number }[]): Promise<{ exi
 
   for (const step of path) {
     const now = token({ priceUsd: step.price, liquidityUsd: step.liquidity ?? entry.liquidityUsd });
-    ctx = ctxFor(now, wallet);
+    ctx = ctxFor(now, wallet, riskOver);
     wallet.markToMarket(new Map([[now.id, now]]));
     await executor.run(ctx);
     if (!wallet.positionFor(entry.id)) break;
@@ -87,8 +94,8 @@ async function run(path: { price: number; liquidity?: number }[]): Promise<{ exi
 
 test("a winner that rolls over is let go while it is still up", async () => {
   const entry = 0.00005901;
-  // Peaks at +45%. With the first rung at +25% that is above the ladder, so
-  // the wide trailing stop is the rule in charge of the remainder.
+  // Peaks at +45%: inside the tight trail's band, because a 30% trail could
+  // not protect a peak this size even if it were in charge.
   const { exits, wallet } = await run([
     { price: entry * 1.2 },
     { price: entry * 1.45 },
@@ -98,27 +105,39 @@ test("a winner that rolls over is let go while it is still up", async () => {
     { price: entry * 0.8 },
   ]);
 
-  // recentFills() is newest-first, so read it the other way round to talk
-  // about the order the desk actually acted in.
-  const chronological = [...exits].reverse();
-  assert.equal(exits.length, 2, "one rung, then the trail");
-  assert.match(chronological[0].reason, /take-profit/, `expected a rung first: ${chronological[0].reason}`);
+  assert.equal(exits.length, 1, "the position closed once");
+  assert.match(exits[0].reason, /early trail/, `wrong rule fired: ${exits[0].reason}`);
 
-  const last = chronological[chronological.length - 1];
-  assert.match(last.reason, /trailing stop|breakeven floor/, `wrong rule fired: ${last.reason}`);
-
-  // The round trip, not the last leg.
-  //
-  // A trailing stop of X% can only ever exit above entry once the peak has
-  // cleared X/(1-X) — 43% for the 30% trail in force above the first rung —
-  // and this path peaks at 45% and then gaps straight through breakeven. So
-  // the final leg closing slightly red is arithmetic, not a broken rule. What
-  // must hold is what the early rung exists for: the trade as a whole stays a
-  // winner, because 40% of it was already banked at +25%.
   const [trade] = wallet.closedTrades();
   assert.ok(trade, "the position closed out");
   assert.ok(trade.pnlPct > 0, `expected a winning round trip, got ${trade.pnlPct.toFixed(1)}%`);
   assert.equal(trade.outcome, "win");
+});
+
+test("the trail handover follows the trail, not the ladder", async () => {
+  // The regression that cost a recorded night. Moving the first rung to +25%
+  // used to hand every position peaking between +25% and +43% to the 30%
+  // trail — which cannot close above entry until the peak clears +43%, so
+  // those winners gave everything back. The handover is now derived from the
+  // trail's own arithmetic, and the ladder no longer moves it.
+  const entry = 0.00005901;
+  const path = [
+    { price: entry * 1.18 },
+    { price: entry * 1.33 },
+    { price: entry * 1.15 },
+    { price: entry * 1.02 },
+    { price: entry * 0.9 },
+  ];
+
+  for (const ladder of [[50, 150, 400], [25, 90, 300]]) {
+    const { wallet } = await run(path, { takeProfitLadder: ladder });
+    const [trade] = wallet.closedTrades();
+    assert.ok(trade, `ladder ${ladder[0]}: the position closed`);
+    assert.ok(
+      trade.pnlPct > 0,
+      `ladder ${ladder[0]}: a +33% peak must not become a loser, got ${trade.pnlPct.toFixed(1)}%`,
+    );
+  }
 });
 
 test("a winner that stalls below the first rung still trails out in profit", async () => {

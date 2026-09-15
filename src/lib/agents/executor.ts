@@ -140,7 +140,25 @@ export class ExecutorAgent extends Agent {
     const peakGainPct = ((position.peakPriceUsd - position.entryPriceUsd) / position.entryPriceUsd) * 100;
 
     const dropFromPeak = ((position.peakPriceUsd - position.currentPriceUsd) / position.peakPriceUsd) * 100;
-    const firstRung = position.takeProfitLadder[0] ?? 50;
+
+    // Where the tight trail hands over to the wide one.
+    //
+    // This used to be the ladder's first rung, which tied two unrelated things
+    // together: a trail of X% cannot close above entry until the peak has
+    // cleared X/(1-X), so with a 30% trail anything peaking under +43% is
+    // handed to a rule that is arithmetically incapable of protecting it. That
+    // was invisible while the first rung sat at +50%, and became the dominant
+    // effect the moment it moved to +25% — the band that protects a modest
+    // winner silently shrank from [14%, 50%) to [14%, 25%).
+    //
+    // The handover now follows from the trail itself. At the default ladder it
+    // resolves to the same +50% as before, so this changes no behaviour the
+    // tape measured; it stops the two settings from being entangled.
+    const wideTrailFloorPct =
+      position.trailingStopPct < 100
+        ? (position.trailingStopPct / (100 - position.trailingStopPct)) * 100
+        : Infinity;
+    const firstRung = Math.max(position.takeProfitLadder[0] ?? 50, wideTrailFloorPct);
 
     // Once a position has clearly worked it must not be able to become a full
     // loser — but a fixed breakeven line is only crossed when the trade is

@@ -95,111 +95,122 @@ derselben Konfiguration ergibt dieselben Trades auf den Cent.
 
 ## 5. Was gemessen wurde
 
-Bench, 24 Kohorten, ~170 Trades pro Variante. Ausgangspunkt ist der Zustand
-vom Übernacht-Lauf.
+### Erst der Prüfstand — und warum er in die Irre führte
 
-| | vorher | + frühe Stufe | + Drain-Trend | + Late-Filter |
+24 Kohorten, ~170 Trades je Variante. Ergebnis damals: die frühe
+Take-Profit-Stufe gewinnt klar (Einbrüche unter −50 % von 20 auf 11,
+Gewinnfaktor 2,83 → 3,02), der Late-Entry-Filter verliert klar (2,16).
+Also wurde die frühe Stufe übernommen und der Filter verworfen.
+
+### Dann 13,9 Stunden echter Markt
+
+1021 Frames, 1087 Paare, aufgezeichnet in einer Nacht.
+
+| | Basis | frühe Stufe | Drain −20 % | Late-Filter |
 |---|---|---|---|---|
-| Gewinnfaktor | 2.83 | **3.02** | 2.77 | 2.16 |
-| Einbrüche < −50 % | 20 | **11** | 21 | 19 |
-| Rückgabe vom Hoch | 79 pp | **74 pp** | 79 pp | 69 pp |
-| Max. Drawdown | 16.7 % | **16.0 %** | 16.9 % | 19.5 % |
-| Rendite | +25.5 % | +23.0 % | +24.9 % | +15.6 % |
+| Rendite | **+1,2 %** | −31,3 % | −17,5 % | −5,8 % |
+| Gewinnfaktor | **1,04** | 0,78 | 0,91 | 0,97 |
+| Trades | 93 (42W/51L) | 100 (40W/60L) | 100 (47W/53L) | 59 (26W/33L) |
+| Trefferquote | 45 % | 40 % | 47 % | 44 % |
+| Einbrüche < −50 % | 12 | **15** | 13 | **10** |
+| Rückgabe vom Hoch | 155 pp | **67 pp** | 142 pp | 54 pp |
+| Max. Drawdown | 30,7 % | 50,7 % | 40,9 % | **29,0 %** |
 
-**Eine von vier Ideen hat die Prüfung bestanden.**
+**Der Prüfstand hat sich bei beiden Urteilen geirrt, und zwar in beide
+Richtungen.** Die frühe Stufe war auf echten Daten die schlechteste Variante.
+Der Late-Entry-Filter, den der Prüfstand am härtesten verworfen hatte, kam auf
+Platz zwei und hatte den niedrigsten Drawdown von allen.
 
-### Übernommen: erste Take-Profit-Stufe bei +25 %
+Das ist kein Detail, sondern das wichtigste Ergebnis dieser Seite: **eine
+selbstgebaute Mischung von Marktformen sagt nichts darüber, was am Markt
+passiert.** Der Prüfstand taugt für Regressionstests einer einzelnen Regel
+(„hätte diese Logik hier herausgefunden?") und für nichts sonst.
 
-`takeProfitLadder: [50, 150, 400]` → `[25, 90, 300]`.
+### Warum die frühe Stufe verlor
 
-Der Grund ist nicht Gewinnmitnahme, sondern Schadensbegrenzung. Ein
-Liquiditätsabzug ist **eine** Transaktion — der nächste Kurs, den das Desk
-sieht, ist schon der Boden. Kein Preis-Stop kann dazwischen auslösen. Das
-Einzige, was eine offene Position noch tun kann, ist **kleiner zu sein**,
-wenn es passiert. 40 % bei +25 % verkauft macht aus einem −97 %-Trade einen
-−49 %-Trade. Einbrüche unter −50 % gingen um 45 % zurück.
+Zwei Gründe, beide nachvollziehbar:
 
-Die Größe der ersten Stufe wurde ebenfalls durchgemessen (30/40/50/60 %):
-mehr als 40 % senkt die Rendite monoton, ohne weitere Einbrüche zu verhindern.
+1. **Sie hat zwei Dinge gleichzeitig geändert.** Die Übergabe vom engen an
+   den weiten Trail hing an der ersten Leitersprosse. Ein Trail von X % kann
+   erst über dem Einstieg schließen, wenn das Hoch X/(1−X) überschritten hat —
+   bei 30 % also +43 %. Mit der Sprosse bei +50 % lag das Schutzfenster bei
+   [14 %, 50 %); mit der Sprosse bei +25 % schrumpfte es auf [14 %, 25 %), und
+   jede Position, die zwischen +25 % und +43 % gipfelte, fiel an eine Regel,
+   die sie rechnerisch nicht schützen konnte. **Das ist inzwischen behoben:**
+   die Übergabe folgt jetzt dem Trail selbst, nicht der Leiter.
 
-### Verworfen: Late-Entry-Filter
+2. **Freigewordenes Kapital kauft mehr Rugs.** 93 → 100 Trades. Der kleinere
+   Verlust je Rug hat die zusätzlichen nicht bezahlt — deshalb stiegen die
+   Einbrüche unter −50 % von 12 auf 15, obwohl genau das Gegenteil das Ziel war.
 
-Die Idee: ein Paar, das schon +1187 % in einer Stunde gemacht hat, ist ein
-später Einstieg in eine abgeschlossene Bewegung, kein starker Trend.
+Die Leiter steht wieder auf `[50, 150, 400]`. Die Idee ist damit nicht
+widerlegt, nur ihre erste Umsetzung: mit entkoppelter Übergabe ist sie als
+Variante `early rung` erneut messbar.
 
-Das Bench sagt klar nein. Bei jeder getesteten Schwelle (80/150/300/600 %)
-verschlechtert sich alles monoton, je enger gefiltert wird — und **kein
-einziger Einbruch** wird verhindert. Wie weit etwas gelaufen ist, sagt
-nichts darüber, ob gleich der Pool gezogen wird.
+### Sagt der Pool den Rug voraus? — Nein
 
-Der Regler bleibt (`maxEntryRunPct`), steht aber auf praktisch aus. Ein
-echtes Tape darf die Frage neu stellen — mit Belegen statt mit Intuition.
+150 Einbrüche ≥ 70 % auf dem Tape, 104 davon mit genug Pool-Historie davor.
 
-### Verworfen: entsättigte Trendkurve
+| | Median Pooländerung in den 6 Min davor |
+|---|---|
+| vor einem Einbruch | **+2,4 %** |
+| bei Überlebenden | +0,0 % |
 
-Die alte QUANT-Kurve (`√trend × 7`, gedeckelt bei 34) erreicht ihr Maximum
-schon bei etwa +24 % Gesamtbewegung. Ein Paar mit +50 % und eines mit
-+1187 % bekommen **dieselbe Punktzahl**. Das sieht nach vernichteter
-Information aus, und eine logarithmische Kurve war die naheliegende Reparatur.
+Der Pool wird vor einem Rug **gefüllt**, nicht geleert. Die beste Schwelle
+(−15 %) fängt 16 % der Einbrüche — 84 % treffen also weiterhin voll — bei 4 %
+Fehlalarmen, und diese 4 % sind eine Untergrenze, weil die Auswertung einen
+Messpunkt je Paar zählt, die Regel live aber bei jedem Tick greift.
 
-Gemessen kostete sie ein Viertel aller Einstiege und ein Fünftel des
-Gewinnfaktors — bei exakt gleich vielen Einbrüchen. Zurückgenommen. Die
-Beobachtung steht als Kommentar im Code, damit sie nicht zum dritten Mal
-neu entdeckt wird.
-
-### Behalten als Notnetz: Drain-Trend
-
-`liquidityTrendExitPct: 40` — 40 % des Pools verschwinden in sechs Minuten,
-während der Kurs hält. Auf dem Bench löst diese Schwelle **nie** aus und
-kostet exakt nichts; niedrigere Schwellen lösen oft aus und kosten etwas.
-
-Es ist kein Edge, sondern eine Absicherung gegen eine Form, die das Desk
-vorher **überhaupt nicht sehen konnte** — jeder bisherige Rug-Test war eine
-Momentaufnahme. Dass der Pool sich leert, während die Position grün aussieht,
-steht in keiner einzelnen Momentaufnahme. Es braucht zwei und eine Subtraktion.
-Genau die frühere Momentaufnahme hat das Desk nie aufgehoben; jetzt schon
-(`PricePoint.l`).
-
----
+Damit ist die Frage beantwortet, die den ganzen Aufzeichnungsaufwand
+gerechtfertigt hat, und die Antwort ist unbequem: **einen Rug kann man nicht
+kommen sehen.** Er ist eine Transaktion, und die Liquidität geht bis zur
+letzten Sekunde hinein. Was bleibt, ist die Einstiegsseite — nicht früher
+aussteigen, sondern seltener hineingehen. Genau dorthin zeigt auch der
+Late-Entry-Filter mit seinen 59 statt 93 Trades.
 
 ## 6. Was das Bench nicht kann
 
-- **Es sagt nichts über Rendite.** Die Mischung der Archetypen (5 Früh-Rugs,
-  2 Spät-Rugs, 3 Distributionen, 4 Bleeds, 4 Chops, 2 Runner) ist gesetzt,
-  nicht gemessen. Sie stammt aus dem Übernacht-Lauf, aber sie bleibt eine
-  Annahme. Andere Mischung, andere Zahlen.
-- **Es kann Rug-Vorhersage nicht prüfen.** Im Bench ist der Zeitpunkt des
-  Abzugs unabhängig von der Pumpgröße — weil ich es so gebaut habe. Ob das
-  in Wirklichkeit auch so ist, kann nur ein Tape sagen. Das ist genau der
-  Punkt, an dem der Late-Entry-Filter hängt.
-- **Die Trefferquote ist zu gut.** Bench ~60 %, live 29 %. Nur *relative*
-  Vergleiche zwischen Varianten zählen, nie die absolute Zahl.
+Nach dem Tape ist diese Liste nicht mehr theoretisch — jeder Punkt ist
+eingetreten.
 
-Jeder Report druckt diese Warnung selbst mit aus, zusammen mit der Zahl der
-Trades im kleinsten Lauf.
+- **Es sagt nichts über Rendite.** Die Mischung der Archetypen ist gesetzt,
+  nicht gemessen. Sie stammte aus dem Übernacht-Lauf und war trotzdem falsch
+  genug, um zwei Urteile umzudrehen.
+- **Es kann Rug-Vorhersage nicht prüfen**, weil ich den Abzugszeitpunkt
+  unabhängig von allem anderen platziert habe. Dass es dort kein Signal
+  meldet, war ein Funktionsnachweis, kein Befund — der Befund kam vom Tape,
+  und er lautete zufällig genauso.
+- **Die Trefferquote ist zu gut.** Bench ~60 %, Tape 45 %, live 38–41 %.
 
----
+Wofür er weiterhin taugt: als Regressionstest für eine einzelne Regel, ohne
+Netz und ohne Warten. „Hätte dieser Ausstieg diese Form erwischt?" beantwortet
+er sofort und zuverlässig. „Verdient diese Regel Geld?" beantwortet er nicht,
+und man sollte ihn nicht fragen.
 
-## 7. Die nächste Frage
+## 7. Was als Nächstes zu messen ist
 
-Ein aufgezeichneter Lauf über eine Nacht. Damit lässt sich beantworten, was
-das Bench prinzipiell nicht kann:
+`npm run backtest -- --tape … --compare` fährt inzwischen diese fünf:
 
-1. **Sagt die Pool-Entwicklung vor dem Rug irgendetwas voraus?**
-   Dafür gibt es jetzt `npm run backtest -- --tape … --rugs`. Es sucht die
-   Paare, die wirklich zusammengebrochen sind (≥70 % in zwei Frames), schaut
-   sich an, was ihr Pool in den Minuten davor tat, und vergleicht das mit
-   allen Paaren, die nicht zusammengebrochen sind.
+| Variante | Frage dahinter |
+|---|---|
+| `baseline` | der ausgelieferte Stand, der als einziger grün war |
+| `early rung` | trägt die frühe Stufe, jetzt ohne die Trail-Verkopplung? |
+| `late 150` / `late 300` | der Filter, den der Prüfstand zu Unrecht verworfen hat |
+| `drain -15` | die Schwelle, die die Rug-Auswertung nominiert hat |
 
-   Entscheidend ist nicht „leeren sich Pools vor einem Rug" — manche tun das
-   zufällig. Entscheidend ist das **Paar aus Trefferrate und Fehlalarmrate**:
-   eine Regel, die 90 % der Rugs fängt und dafür die Hälfte des Marktes
-   aussperrt, ist schlechter als gar keine Regel, und nur die zweite Zahl
-   sagt das. Die Ausgabe stellt beide nebeneinander.
+Zwei Fragen bleiben offen, und beide sind am Tape auswertbar statt nur
+diskutierbar:
 
-   Auf dem Prüfstand meldet das Werkzeug korrekt **kein** Signal — dort wird
-   der Pool bis zuletzt gefüllt, weil ich ihn so gebaut habe. Das ist der
-   Funktionsnachweis: es findet nichts, wo nichts ist.
-2. Sind Paare, die schon 10x gelaufen sind, häufiger Rugs — oder nicht?
-3. Welcher Agent trägt wirklich zum Ergebnis bei? Die Konsensgewichte
-   (0.5 / 0.3 / 0.2) sind geschätzt und noch nie gemessen worden.
+1. **Alterfenster und SCOUT-Ranking.** Medianalter der Watchlist 1 h, im Board
+   stehen trotzdem regelmäßig deutlich ältere Paare. Ein tiefer Pool schlägt
+   offenbar die Frische.
+2. **Agenten-Attribution.** Die Konsens-Gewichte 0.5 / 0.3 / 0.2 sind
+   geschätzt und noch nie gemessen worden. Am Tape ist das eine Auswertung,
+   kein Umbau.
+
+Und eine dritte, die das Tape gerade neu aufgeworfen hat: der Median der
+Pooländerung liegt vor einem Einbruch bei +2,4 %, bei Überlebenden bei 0,0 %.
+Ein Unterschied besteht also — nur nicht dort, wo eine feste Schwelle ihn
+greifen könnte. Er wäre **relativ zum eigenen Verlauf** des Paares zu messen,
+nicht absolut. Das ist noch keine Regel, aber es ist die einzige Spur, die
+das Tape auf der Rug-Seite hinterlassen hat.
